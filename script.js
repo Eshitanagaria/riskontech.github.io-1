@@ -52,6 +52,14 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Create RISKON Themed "Dossier" Report ---
     function createDossierReport(applicantId) {
         const applicant = applicantsData[applicantId];
+
+        // BUG FIX: Check for applicant data and history existence at the very start.
+        if (!applicant || !applicant.history || applicant.history.length === 0) {
+            reportContentWrapper.innerHTML = `<div class="report-container"><p class="text-red-400 text-center text-lg p-10">Error: Critical data missing for applicant ${applicantId}. Cannot generate report.</p></div>`;
+            gsap.from(reportContentWrapper, {opacity: 0, y: 20, duration: 0.5});
+            return;
+        }
+
         const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
         
         const prob = latestRecord.Predicted_Prob_Default;
@@ -202,19 +210,97 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- Landing Page Animations ---
-    let heroScene, heroCamera, heroRenderer, heroParticles;
-    function initHeroAnimation() { /* ... [Unchanged Hero Animation Code] ... */ }
-    function animateHero() { /* ... [Unchanged Hero Animation Code] ... */ }
-    window.addEventListener('resize', () => { if(heroRenderer) { /* ... */ } }, false);
+    // --- SVG HERO ANIMATION (NO CANVAS) ---
+    function initHeroAnimation() {
+        const svg = document.getElementById('hero-svg-animation');
+        if (!svg) return;
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const particles = [];
+        const numParticles = 1000;
+        const targetPositions = [];
+        const initialPositions = [];
+
+        // Temporarily create text to get its path
+        const tempText = document.createElementNS(svgNS, "text");
+        tempText.setAttribute('x', '50%');
+        tempText.setAttribute('y', '50%');
+        tempText.setAttribute('text-anchor', 'middle');
+        tempText.setAttribute('dominant-baseline', 'middle');
+        tempText.setAttribute('font-size', '150');
+        tempText.setAttribute('font-weight', 'bold');
+        tempText.setAttribute('fill', 'white');
+        tempText.textContent = 'RISKON';
+        svg.appendChild(tempText);
+
+        const textLength = tempText.getTotalLength();
+        for (let i = 0; i < numParticles; i++) {
+            const point = tempText.getPointAtLength((i / numParticles) * textLength);
+            targetPositions.push({ x: point.x, y: point.y });
+        }
+        svg.removeChild(tempText);
+
+        // Create particles
+        for (let i = 0; i < numParticles; i++) {
+            const circle = document.createElementNS(svgNS, "circle");
+            const initialX = Math.random() * window.innerWidth;
+            const initialY = Math.random() * window.innerHeight;
+            initialPositions.push({ x: initialX, y: initialY });
+
+            circle.setAttribute('cx', initialX);
+            circle.setAttribute('cy', initialY);
+            circle.setAttribute('r', 1.5);
+            circle.setAttribute('fill', '#3b82f6');
+            svg.appendChild(circle);
+            particles.push(circle);
+        }
+
+        const tl = gsap.timeline({
+            scrollTrigger: {
+                trigger: "#hero-section",
+                start: "top top",
+                end: "bottom bottom",
+                scrub: 1,
+            }
+        });
+
+        tl.to({}, {
+            duration: 1,
+            onUpdate: function() {
+                const progress = this.progress();
+                particles.forEach((p, i) => {
+                    const newX = gsap.utils.interpolate(initialPositions[i].x, targetPositions[i].x, progress);
+                    const newY = gsap.utils.interpolate(initialPositions[i].y, targetPositions[i].y, progress);
+                    p.setAttribute('cx', newX);
+                    p.setAttribute('cy', newY);
+                });
+            }
+        }, 0);
+
+        tl.to({}, {
+            duration: 1,
+            onUpdate: function() {
+                const progress = this.progress();
+                particles.forEach((p, i) => {
+                    const newX = gsap.utils.interpolate(targetPositions[i].x, Math.random() * window.innerWidth, progress);
+                    const newY = gsap.utils.interpolate(targetPositions[i].y, Math.random() * window.innerHeight, progress);
+                    p.setAttribute('cx', newX);
+                    p.setAttribute('cy', newY);
+                    p.setAttribute('opacity', 1 - progress);
+                });
+            }
+        }, 1);
+        
+        tl.to("#hero-text", { opacity: 1, duration: 0.5 }, 1.5);
+    }
     initHeroAnimation();
     
-    // --- "ASSEMBLING PIPELINE" ANIMATION ---
+    // --- "JOURNEY OF DATA" ANIMATION ---
     const solutionStepsData = [ { title: "Stage 1 - Ingestion", description: "We take in the chaos." }, { title: "Stage 2 - Processing", description: "We process and structure information." }, { title: "Stage 3 - Intelligence", description: "We learn from the patterns." }, { title: "Stage 4 - Prediction", description: "We predict risk, before it strikes." } ];
     const stepsContainer = document.getElementById('solution-steps');
     solutionStepsData.forEach((step, i) => { stepsContainer.innerHTML += `<div class="step-content" id="step-${i}"><h3 class="text-3xl font-bold mb-3">${step.title}</h3><p class="text-slate-400 text-lg">${step.description}</p></div>`; });
     
-    let vizScene, vizCamera, vizRenderer, tube, nodes = [], head;
+    let vizScene, vizCamera, vizRenderer, particles;
     
     function initSolutionViz() {
         const container = document.getElementById('solution-viz');
@@ -224,81 +310,92 @@ document.addEventListener('DOMContentLoaded', function () {
         vizRenderer = new THREE.WebGLRenderer({ alpha: true });
         vizRenderer.setSize(container.clientWidth, container.clientHeight);
         container.appendChild(vizRenderer.domElement);
-        vizCamera.position.set(0, 0, 12);
+        vizCamera.position.set(0, 0, 15);
 
-        const curve = new THREE.CatmullRomCurve3([
-            new THREE.Vector3(0, 8, 0), new THREE.Vector3(4, 4, 0),
-            new THREE.Vector3(-4, 0, 0), new THREE.Vector3(4, -4, 0),
-            new THREE.Vector3(0, -8, 0)
-        ]);
+        const particleGeo = new THREE.BufferGeometry();
+        const particleCount = 2000;
+        const posArray = new Float32Array(particleCount * 3);
+        const colorArray = new Float32Array(particleCount * 3);
+        for(let i=0; i < particleCount * 3; i++) { posArray[i] = (Math.random() - 0.5) * 20; }
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        particleGeo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+        const particleMat = new THREE.PointsMaterial({ size: 0.05, vertexColors: true });
+        particles = new THREE.Points(particleGeo, particleMat);
+        vizScene.add(particles);
 
-        const tubeGeo = new THREE.TubeGeometry(curve, 128, 0.1, 8, false);
-        const tubeMat = new THREE.MeshBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.3 });
-        tube = new THREE.Mesh(tubeGeo, tubeMat);
-        vizScene.add(tube);
-        
-        const headGeo = new THREE.SphereGeometry(0.3, 32, 32);
-        const headMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x3b82f6, metalness: 0.5, roughness: 0.2 });
-        head = new THREE.Mesh(headGeo, headMat);
-        vizScene.add(head);
-
-        const nodeGeo = new THREE.SphereGeometry(0.4, 32, 32);
-        for(let i = 0; i < 5; i++) {
-            const nodeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, emissive: 0x1e293b, metalness: 0.8, roughness: 0.4 });
-            const node = new THREE.Mesh(nodeGeo, nodeMat);
-            node.position.copy(curve.getPoint(i / 4));
-            nodes.push(node);
-            vizScene.add(node);
-        }
-
-        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-        pointLight.position.set(0, 0, 5);
-        vizScene.add(pointLight);
-        vizScene.add(new THREE.AmbientLight(0xffffff, 0.2));
-
-        gsap.timeline({
+        const tl = gsap.timeline({
             scrollTrigger: {
                 trigger: "#solution-section-container",
                 start: "top top",
                 end: "bottom bottom",
-                scrub: 1,
+                scrub: true,
                 onUpdate: (self) => {
                     const progress = self.progress;
-                    const point = curve.getPointAt(progress);
-                    head.position.copy(point);
-                    tube.geometry.setDrawRange(0, Math.floor(progress * tube.geometry.attributes.position.count));
+                    const stepProgress = Math.floor(progress * solutionStepsData.length);
+                    const stepContents = document.querySelectorAll(".step-content");
+                    stepContents.forEach((step, i) => {
+                        step.classList.toggle('is-active', i === stepProgress);
+                    });
                 }
             }
         });
 
-        const stepContents = document.querySelectorAll(".step-content");
-        stepContents.forEach((step, i) => { 
-            ScrollTrigger.create({ 
-                trigger: step, 
-                start: "top center", 
-                end: "bottom center", 
-                toggleClass: "is-active",
-                onEnter: () => animateNode(i),
-                onEnterBack: () => animateNode(i),
-            }); 
-        });
+        const positions = particles.geometry.attributes.position.array;
+        const colors = particles.geometry.attributes.color.array;
+        
+        // Stage 1: Ingestion
+        tl.to({}, { duration: 0.25, onUpdate: function(){
+            const progress = this.progress();
+            for(let i=0; i<particleCount; i++){
+                positions[i*3+1] = gsap.utils.interpolate(positions[i*3+1], (Math.random()-0.5)*2, progress);
+            }
+        }});
 
+        // Stage 2: Processing
+        tl.to({}, { duration: 0.25, onUpdate: function(){
+            const progress = this.progress();
+            for(let i=0; i<particleCount; i++){
+                const newColor = progress < 0.5 ? {r:1, g:1, b:1} : {r:59/255, g:130/255, b:246/255};
+                colors[i*3] = gsap.utils.interpolate(colors[i*3], newColor.r, progress);
+                colors[i*3+1] = gsap.utils.interpolate(colors[i*3+1], newColor.g, progress);
+                colors[i*3+2] = gsap.utils.interpolate(colors[i*3+2], newColor.b, progress);
+            }
+        }});
+        
+        // Stage 3: Intelligence
+        tl.to({}, { duration: 0.25, onUpdate: function(){
+            const progress = this.progress();
+            for(let i=0; i<particleCount; i++){
+                const cluster = Math.floor(i / (particleCount/3));
+                const targetX = (cluster-1)*4 + (Math.random()-0.5)*2;
+                positions[i*3] = gsap.utils.interpolate(positions[i*3], targetX, progress);
+            }
+        }});
+        
+        // Stage 4: Prediction
+        tl.to({}, { duration: 0.25, onUpdate: function(){
+            const progress = this.progress();
+            const side = Math.ceil(Math.sqrt(particleCount));
+            for(let i=0; i<particleCount; i++){
+                const targetX = ((i % side) - side/2) * 0.2;
+                const targetY = (Math.floor(i / side) - side/2) * 0.2;
+                positions[i*3] = gsap.utils.interpolate(positions[i*3], targetX, progress);
+                positions[i*3+1] = gsap.utils.interpolate(positions[i*3+1], targetY, progress);
+                positions[i*3+2] = gsap.utils.interpolate(positions[i*3+2], 0, progress);
+            }
+        }});
+
+        function animateViz() {
+            requestAnimationFrame(animateViz);
+            if (vizRenderer) {
+                if(particles) {
+                    particles.geometry.attributes.position.needsUpdate = true;
+                    particles.geometry.attributes.color.needsUpdate = true;
+                }
+                vizRenderer.render(vizScene, vizCamera);
+            }
+        }
         animateViz();
     }
-
-    function animateNode(index) {
-        nodes.forEach((node, i) => {
-            const isActive = i === index;
-            gsap.to(node.material.color, { r: isActive ? 59/255 : 148/255, g: isActive ? 130/255 : 163/255, b: isActive ? 246/255 : 184/255, duration: 0.5 });
-            gsap.to(node.material, { emissiveIntensity: isActive ? 1 : 0, duration: 0.5 });
-            gsap.to(node.scale, { x: isActive ? 1.5 : 1, y: isActive ? 1.5 : 1, z: isActive ? 1.5 : 1, duration: 0.5, ease: "back.out(1.7)" });
-        });
-    }
-
-    function animateViz() {
-        requestAnimationFrame(animateViz);
-        if (vizRenderer) vizRenderer.render(vizScene, vizCamera);
-    }
-    
     initSolutionViz();
 });
