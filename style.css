@@ -60,15 +60,17 @@ body {
 }
 
 
-/* --- NEW RISKON THEMED REPORT STYLES --- */
+/* --- RISKON "DOSSIER" REPORT STYLES --- */
 .report-container {
     color: #d1d5db;
-    font-family: 'Inter', sans-serif;
 }
 .report-header {
     padding-bottom: 1rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     border-bottom: 2px solid #3b82f6;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
 }
 .report-header h1 {
     font-size: 2.25rem;
@@ -79,22 +81,25 @@ body {
     font-size: 0.875rem;
     color: #9ca3af;
     text-align: right;
+    flex-shrink: 0;
+    margin-left: 2rem;
 }
 .report-section {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     background-color: #1f2937;
     border-radius: 0.75rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 1.5rem;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 .report-section-title {
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     font-weight: 600;
     color: #ffffff;
-    padding-bottom: 0.75rem;
-    margin-bottom: 1rem;
+    padding: 1rem 1.5rem;
     border-bottom: 1px solid #374151;
+}
+.report-section-content {
+    padding: 1.5rem;
 }
 .grid-2-col {
     display: grid;
@@ -125,6 +130,8 @@ body {
 }
 .graph-container {
     margin-top: 1.5rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
 }
 .graph-container img {
     width: 100%;
@@ -134,7 +141,7 @@ body {
 }
 .payment-history-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1rem;
 }
 .payment-history-grid .info-pair {
@@ -145,42 +152,65 @@ body {
     border-bottom: none;
 }
 
-/* Gauge Styles */
-.cibil-gauge {
-    position: relative;
-    width: 100%;
-    min-height: 150px;
+/* CORRECTED Gauge Styles */
+.score-gauge-container {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-direction: column;
+    position: relative;
+    width: 200px;
+    height: 100px; /* Half height for semi-circle */
+    margin: 1.5rem auto 0;
+    overflow: hidden; /* Hide the bottom half of the circle */
 }
-.cibil-gauge-svg {
-    transform: rotate(-90deg);
-    width: 100%;
-    max-width: 250px;
-    height: auto;
+.score-gauge-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200px;
+    height: 200px;
+    transform: rotate(-180deg); /* Start from the left */
 }
-.cibil-gauge-track {
+.score-gauge-track, .score-gauge-bar {
+    cx: 100;
+    cy: 100;
+    r: 80;
+    fill: none;
+    stroke-width: 20;
+}
+.score-gauge-track {
     stroke: #374151;
-    stroke-width: 12;
-    fill: none;
 }
-.cibil-gauge-bar {
-    stroke-width: 12;
-    fill: none;
+.score-gauge-bar {
     stroke-linecap: round;
-    transition: stroke-dashoffset 1s ease-in-out;
 }
-.cibil-gauge-text {
-    position: absolute;
-    bottom: 20px;
+.score-gauge-text {
+    position: relative;
+    top: -20px; /* Adjust vertical position */
+    text-align: center;
+}
+.score-gauge-text .score-value {
     font-size: 3rem;
-    font-weight: 700;
+    font-weight: 800;
+    line-height: 1;
 }
-.cibil-gauge-label {
-    position: absolute;
-    bottom: 5px;
-    color: #9ca3af;
+.score-gauge-text .score-label {
     font-size: 0.875rem;
+    color: #9ca3af;
+    margin-top: 0.25rem;
+}
+
+/* Prettier AI Summary */
+#ai-summary-content {
+    background-color: #111827;
+    border-left: 4px solid #3b82f6;
+    padding: 1rem;
+    border-radius: 0.25rem;
+}
+#ai-summary-text::after {
+    content: '▋';
+    animation: blink 1s step-end infinite;
+}
+@keyframes blink {
+    50% { opacity: 0; }
 }
