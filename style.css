@@ -28,7 +28,7 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
-    min-height: 500vh;
+    min-height: 400vh; /* Adjusted for 4 stages */
 }
 #solution-steps {
     position: relative;
@@ -152,49 +152,17 @@ body {
     border-bottom: none;
 }
 
-/* CORRECTED Gauge Styles */
-.score-gauge-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    width: 200px;
-    height: 100px; /* Half height for semi-circle */
-    margin: 1.5rem auto 0;
-    overflow: hidden; /* Hide the bottom half of the circle */
-}
-.score-gauge-svg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 200px;
-    height: 200px;
-    transform: rotate(-180deg); /* Start from the left */
-}
-.score-gauge-track, .score-gauge-bar {
-    cx: 100;
-    cy: 100;
-    r: 80;
-    fill: none;
-    stroke-width: 20;
-}
-.score-gauge-track {
-    stroke: #374151;
-}
-.score-gauge-bar {
-    stroke-linecap: round;
-}
-.score-gauge-text {
-    position: relative;
-    top: -20px; /* Adjust vertical position */
+/* Text-based Score */
+.score-box {
     text-align: center;
+    padding: 1rem;
 }
-.score-gauge-text .score-value {
-    font-size: 3rem;
+.score-box .score-value {
+    font-size: 4rem;
     font-weight: 800;
     line-height: 1;
 }
-.score-gauge-text .score-label {
+.score-box .score-label {
     font-size: 0.875rem;
     color: #9ca3af;
     margin-top: 0.25rem;
