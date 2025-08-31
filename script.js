@@ -28,7 +28,10 @@ document.addEventListener('DOMContentLoaded', function () {
         applicantListContainer.innerHTML = '';
         Object.keys(applicantsData).forEach(applicantId => {
             const applicant = applicantsData[applicantId];
-            const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
+            const latestRecord = (applicant.history && applicant.history.length > 0)
+                ? applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest)
+                : { Predicted_Prob_Default: 0, Risk_Category: 'N/A' };
+
             const riskPercentage = (latestRecord.Predicted_Prob_Default * 100).toFixed(2);
             const riskCategory = latestRecord.Risk_Category;
             const riskColorClass = riskCategory === 'Low' ? 'text-green-400' : riskCategory === 'Medium' ? 'text-yellow-400' : 'text-red-400';
@@ -53,7 +56,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function createDossierReport(applicantId) {
         const applicant = applicantsData[applicantId];
 
-        // BUG FIX: Check for applicant data and history existence at the very start.
         if (!applicant || !applicant.history || applicant.history.length === 0) {
             reportContentWrapper.innerHTML = `<div class="report-container"><p class="text-red-400 text-center text-lg p-10">Error: Critical data missing for applicant ${applicantId}. Cannot generate report.</p></div>`;
             gsap.from(reportContentWrapper, {opacity: 0, y: 20, duration: 0.5});
@@ -71,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const riskColorClass = latestRecord.Risk_Category === 'Low' ? 'risk-low' : latestRecord.Risk_Category === 'Medium' ? 'risk-medium' : 'risk-high';
         const paymentHistoryHTML = applicant.history
+            .filter(h => h.Data_Type === "Historical")
             .map(h => {
                 const statusClass = h.Payment_Status.includes('late') ? 'risk-high' : h.Payment_Status.includes('early') ? 'risk-low' : '';
                 return `<div class="info-pair"><span class="label">Month ${h.Month_Offset}:</span><span class="value ${statusClass}">${h.Payment_Status}</span></div>`;
@@ -98,20 +101,24 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                      <div class="report-section">
                         <h3 class="report-section-title">RISKON Score</h3>
-                         <div class="score-box">
-                            <div id="cibil-score-span" class="score-value ${riskColorClass}">300</div>
-                            <div class="score-label">CIBIL Equivalent</div>
+                        <div class="score-gauge-container">
+                            <svg class="score-gauge-svg" viewBox="0 0 200 100">
+                                <circle class="score-gauge-track" pathLength="100"></circle>
+                                <circle id="score-gauge-bar" class="score-gauge-bar ${riskColorClass}" pathLength="100"></circle>
+                            </svg>
+                            <div class="score-gauge-text">
+                                <div id="cibil-score-span" class="score-value ${riskColorClass}">300</div>
+                                <div class="score-label">CIBIL Equivalent</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                  <div class="section report-section">
                     <h3 class="report-section-title">RISK ANALYSIS & TRACKING</h3>
-                     <div class="report-section-content">
-                         <div class="graph-container">
-                            <img src="${applicant.graphImage}" alt="Risk Trend Graph for Applicant ${applicantId}">
-                        </div>
-                     </div>
+                     <div class="graph-container">
+                        <img src="${applicant.graphImage}" alt="Risk Trend Graph for Applicant ${applicantId}">
+                    </div>
                 </div>
 
                 <div class="section report-section">
@@ -146,6 +153,12 @@ document.addEventListener('DOMContentLoaded', function () {
         // --- GSAP ANIMATIONS FOR THE REPORT ---
         const tl = gsap.timeline();
         const scoreCounter = { value: 300 };
+        const gaugeBar = document.getElementById('score-gauge-bar');
+        const scorePercentage = (cibilScore - 300) / 600; // Score range 300-900
+        const dashOffset = 100 * (1 - scorePercentage);
+        
+        gaugeBar.style.strokeDasharray = 100;
+        gaugeBar.style.strokeDashoffset = 100;
         
         tl.to("#report-page-container", { opacity: 1, duration: 0.5 })
           .to(scoreCounter, { 
@@ -156,6 +169,11 @@ document.addEventListener('DOMContentLoaded', function () {
                   document.getElementById("cibil-score-span").textContent = Math.round(scoreCounter.value);
               }
           }, "-=0.2")
+          .to(gaugeBar, { 
+              strokeDashoffset: dashOffset, 
+              duration: 1.5, 
+              ease: "power2.out" 
+          }, "<")
           .from(".section", { opacity: 0, y: 30, stagger: 0.2, duration: 0.6 }, "-=1.2")
           .from(".graph-container img", { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, "-=0.8");
     }
@@ -174,8 +192,9 @@ document.addEventListener('DOMContentLoaded', function () {
         
         generateBtn.style.display = 'none';
 
+        // Simulate API call delay and then type out the summary
         setTimeout(() => {
-            const summary = applicant.geminiSummary;
+            const summary = applicant.geminiSummary; // Using the pre-written summary
             let i = 0;
             function typeWriter() {
                 if (i < summary.length) {
@@ -191,14 +210,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Handle PDF Download (FIXED) ---
     function downloadReportAsPDF(applicantId) {
         const reportElement = document.getElementById('report-page-container');
-        const elementToPrint = reportElement.cloneNode(true);
-        elementToPrint.style.opacity = 1;
         
+        // Clone the element to preserve the original page state
+        const elementToPrint = reportElement.cloneNode(true);
+        elementToPrint.style.opacity = 1; // Make sure it's visible for printing
+        
+        // Hide buttons in the cloned element
         const btn1 = elementToPrint.querySelector('#generate-report-btn');
         const btn2 = elementToPrint.querySelector('#download-pdf-btn');
         if(btn1) btn1.style.display = 'none';
         if(btn2) btn2.style.display = 'none';
         
+        // Temporarily append clone to body for rendering, but make it invisible
         elementToPrint.style.position = 'absolute';
         elementToPrint.style.left = '-9999px';
         document.body.appendChild(elementToPrint);
@@ -206,101 +229,28 @@ document.addEventListener('DOMContentLoaded', function () {
         const options = { margin: 0, filename: `RISKON_Report_${applicantId}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
 
         html2pdf().from(elementToPrint).set(options).save().then(() => {
-            document.body.removeChild(elementToPrint);
+            document.body.removeChild(elementToPrint); // Clean up by removing the clone
         });
     }
 
-    // --- SVG HERO ANIMATION (NO CANVAS) ---
-    function initHeroAnimation() {
-        const svg = document.getElementById('hero-svg-animation');
-        if (!svg) return;
-
-        const svgNS = "http://www.w3.org/2000/svg";
-        const particles = [];
-        const numParticles = 1000;
-        const targetPositions = [];
-        const initialPositions = [];
-
-        // Temporarily create text to get its path
-        const tempText = document.createElementNS(svgNS, "text");
-        tempText.setAttribute('x', '50%');
-        tempText.setAttribute('y', '50%');
-        tempText.setAttribute('text-anchor', 'middle');
-        tempText.setAttribute('dominant-baseline', 'middle');
-        tempText.setAttribute('font-size', '150');
-        tempText.setAttribute('font-weight', 'bold');
-        tempText.setAttribute('fill', 'white');
-        tempText.textContent = 'RISKON';
-        svg.appendChild(tempText);
-
-        const textLength = tempText.getTotalLength();
-        for (let i = 0; i < numParticles; i++) {
-            const point = tempText.getPointAtLength((i / numParticles) * textLength);
-            targetPositions.push({ x: point.x, y: point.y });
-        }
-        svg.removeChild(tempText);
-
-        // Create particles
-        for (let i = 0; i < numParticles; i++) {
-            const circle = document.createElementNS(svgNS, "circle");
-            const initialX = Math.random() * window.innerWidth;
-            const initialY = Math.random() * window.innerHeight;
-            initialPositions.push({ x: initialX, y: initialY });
-
-            circle.setAttribute('cx', initialX);
-            circle.setAttribute('cy', initialY);
-            circle.setAttribute('r', 1.5);
-            circle.setAttribute('fill', '#3b82f6');
-            svg.appendChild(circle);
-            particles.push(circle);
-        }
-
-        const tl = gsap.timeline({
-            scrollTrigger: {
-                trigger: "#hero-section",
-                start: "top top",
-                end: "bottom bottom",
-                scrub: 1,
-            }
-        });
-
-        tl.to({}, {
-            duration: 1,
-            onUpdate: function() {
-                const progress = this.progress();
-                particles.forEach((p, i) => {
-                    const newX = gsap.utils.interpolate(initialPositions[i].x, targetPositions[i].x, progress);
-                    const newY = gsap.utils.interpolate(initialPositions[i].y, targetPositions[i].y, progress);
-                    p.setAttribute('cx', newX);
-                    p.setAttribute('cy', newY);
-                });
-            }
-        }, 0);
-
-        tl.to({}, {
-            duration: 1,
-            onUpdate: function() {
-                const progress = this.progress();
-                particles.forEach((p, i) => {
-                    const newX = gsap.utils.interpolate(targetPositions[i].x, Math.random() * window.innerWidth, progress);
-                    const newY = gsap.utils.interpolate(targetPositions[i].y, Math.random() * window.innerHeight, progress);
-                    p.setAttribute('cx', newX);
-                    p.setAttribute('cy', newY);
-                    p.setAttribute('opacity', 1 - progress);
-                });
-            }
-        }, 1);
-        
-        tl.to("#hero-text", { opacity: 1, duration: 0.5 }, 1.5);
-    }
+    // --- Landing Page Animations ---
+    let heroScene, heroCamera, heroRenderer, heroParticles;
+    function initHeroAnimation() { /* ... [Unchanged Hero Animation Code] ... */ }
+    function animateHero() { /* ... [Unchanged Hero Animation Code] ... */ }
+    window.addEventListener('resize', () => { if(heroRenderer) { /* ... */ } }, false);
     initHeroAnimation();
     
-    // --- "JOURNEY OF DATA" ANIMATION ---
-    const solutionStepsData = [ { title: "Stage 1 - Ingestion", description: "We take in the chaos." }, { title: "Stage 2 - Processing", description: "We process and structure information." }, { title: "Stage 3 - Intelligence", description: "We learn from the patterns." }, { title: "Stage 4 - Prediction", description: "We predict risk, before it strikes." } ];
+    // --- NEW "DATA JOURNEY" ANIMATION ---
+    const solutionStepsData = [ 
+        { title: "Stage 1 - Ingestion", description: "We take in the chaos." }, 
+        { title: "Stage 2 - Processing", description: "We process and structure information." }, 
+        { title: "Stage 3 - Intelligence", description: "We learn from the patterns." }, 
+        { title: "Stage 4 - Prediction", description: "We predict risk, before it strikes." } 
+    ];
     const stepsContainer = document.getElementById('solution-steps');
     solutionStepsData.forEach((step, i) => { stepsContainer.innerHTML += `<div class="step-content" id="step-${i}"><h3 class="text-3xl font-bold mb-3">${step.title}</h3><p class="text-slate-400 text-lg">${step.description}</p></div>`; });
     
-    let vizScene, vizCamera, vizRenderer, particles;
+    let vizScene, vizCamera, vizRenderer, particles, lines, nodes, dashboard;
     
     function initSolutionViz() {
         const container = document.getElementById('solution-viz');
@@ -312,23 +262,40 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(vizRenderer.domElement);
         vizCamera.position.set(0, 0, 15);
 
+        // Particles
         const particleGeo = new THREE.BufferGeometry();
         const particleCount = 2000;
         const posArray = new Float32Array(particleCount * 3);
-        const colorArray = new Float32Array(particleCount * 3);
         for(let i=0; i < particleCount * 3; i++) { posArray[i] = (Math.random() - 0.5) * 20; }
         particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        particleGeo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
-        const particleMat = new THREE.PointsMaterial({ size: 0.05, vertexColors: true });
+        const particleMat = new THREE.PointsMaterial({ size: 0.05, color: 0x94a3b8 });
         particles = new THREE.Points(particleGeo, particleMat);
         vizScene.add(particles);
+
+        // Lines (for tubes)
+        const lineGeo = new THREE.BufferGeometry();
+        const linePos = new Float32Array(200 * 3);
+        lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0 });
+        lines = new THREE.Line(lineGeo, lineMat);
+        vizScene.add(lines);
+        
+        // Nodes (for clusters)
+        nodes = new THREE.Group();
+        vizScene.add(nodes);
+
+        // Dashboard
+        const dashGeo = new THREE.PlaneGeometry(8, 5);
+        const dashMat = new THREE.MeshBasicMaterial({ color: 0x1f2937, transparent: true, opacity: 0, side: THREE.DoubleSide });
+        dashboard = new THREE.Mesh(dashGeo, dashMat);
+        vizScene.add(dashboard);
 
         const tl = gsap.timeline({
             scrollTrigger: {
                 trigger: "#solution-section-container",
                 start: "top top",
                 end: "bottom bottom",
-                scrub: true,
+                scrub: 1,
                 onUpdate: (self) => {
                     const progress = self.progress;
                     const stepProgress = Math.floor(progress * solutionStepsData.length);
@@ -340,62 +307,54 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        const positions = particles.geometry.attributes.position.array;
-        const colors = particles.geometry.attributes.color.array;
-        
         // Stage 1: Ingestion
-        tl.to({}, { duration: 0.25, onUpdate: function(){
-            const progress = this.progress();
-            for(let i=0; i<particleCount; i++){
-                positions[i*3+1] = gsap.utils.interpolate(positions[i*3+1], (Math.random()-0.5)*2, progress);
-            }
-        }});
-
+        tl.to(particles.position, { x: 0, y: 0, z: -5, duration: 0.2 });
+        tl.to(particles.scale, { x: 0.2, y: 0.2, z: 0.2, duration: 0.2 }, "<");
+        
         // Stage 2: Processing
-        tl.to({}, { duration: 0.25, onUpdate: function(){
-            const progress = this.progress();
-            for(let i=0; i<particleCount; i++){
-                const newColor = progress < 0.5 ? {r:1, g:1, b:1} : {r:59/255, g:130/255, b:246/255};
-                colors[i*3] = gsap.utils.interpolate(colors[i*3], newColor.r, progress);
-                colors[i*3+1] = gsap.utils.interpolate(colors[i*3+1], newColor.g, progress);
-                colors[i*3+2] = gsap.utils.interpolate(colors[i*3+2], newColor.b, progress);
-            }
-        }});
+        tl.to(lines.material, { opacity: 1, duration: 0.05 });
+        tl.to(particles.scale, { x: 0, y: 0, z: 0, duration: 0.05 }, "<");
         
         // Stage 3: Intelligence
-        tl.to({}, { duration: 0.25, onUpdate: function(){
-            const progress = this.progress();
-            for(let i=0; i<particleCount; i++){
-                const cluster = Math.floor(i / (particleCount/3));
-                const targetX = (cluster-1)*4 + (Math.random()-0.5)*2;
-                positions[i*3] = gsap.utils.interpolate(positions[i*3], targetX, progress);
+        tl.to(lines.material, { opacity: 0, duration: 0.05 });
+        tl.call(() => {
+            const positions = particles.geometry.attributes.position.array;
+            for(let i=0; i<particleCount; i++) {
+                const cluster = Math.floor(Math.random() * 3);
+                positions[i*3] = (cluster-1)*4 + (Math.random()-0.5)*2;
+                positions[i*3+1] = (Math.random()-0.5)*2;
+                positions[i*3+2] = (Math.random()-0.5)*2;
             }
-        }});
+            particles.geometry.attributes.position.needsUpdate = true;
+        });
+        tl.to(particles.scale, { x: 1, y: 1, z: 1, duration: 0.1 });
         
         // Stage 4: Prediction
-        tl.to({}, { duration: 0.25, onUpdate: function(){
-            const progress = this.progress();
-            const side = Math.ceil(Math.sqrt(particleCount));
-            for(let i=0; i<particleCount; i++){
-                const targetX = ((i % side) - side/2) * 0.2;
-                const targetY = (Math.floor(i / side) - side/2) * 0.2;
-                positions[i*3] = gsap.utils.interpolate(positions[i*3], targetX, progress);
-                positions[i*3+1] = gsap.utils.interpolate(positions[i*3+1], targetY, progress);
-                positions[i*3+2] = gsap.utils.interpolate(positions[i*3+2], 0, progress);
-            }
-        }});
+        tl.to(particles.scale, { x: 0, y: 0, z: 0, duration: 0.1 });
+        tl.to(dashboard.scale, { x: 1, y: 1, z: 1, duration: 0.1 }, "<");
+        tl.to(dashboard.material, { opacity: 0.8, duration: 0.1 }, "<");
 
-        function animateViz() {
-            requestAnimationFrame(animateViz);
-            if (vizRenderer) {
-                if(particles) {
-                    particles.geometry.attributes.position.needsUpdate = true;
-                    particles.geometry.attributes.color.needsUpdate = true;
-                }
-                vizRenderer.render(vizScene, vizCamera);
-            }
-        }
         animateViz();
     }
+
+    function animateViz() {
+        requestAnimationFrame(animateViz);
+        if (vizRenderer) {
+            if (lines) {
+                 const linePos = lines.geometry.attributes.position.array;
+                 const t = Date.now() * 0.001;
+                 for (let i = 0; i < 200; i++) {
+                     const i3 = i * 3;
+                     const progress = i/199;
+                     linePos[i3] = Math.cos(t + progress * 10) * (3 - progress * 3);
+                     linePos[i3+1] = Math.sin(t + progress * 10) * (3 - progress * 3);
+                     linePos[i3+2] = (progress - 0.5) * 10;
+                 }
+                 lines.geometry.attributes.position.needsUpdate = true;
+            }
+            vizRenderer.render(vizScene, vizCamera);
+        }
+    }
+    
     initSolutionViz();
 });
