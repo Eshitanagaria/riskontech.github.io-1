@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     gsap.registerPlugin(ScrollTrigger);
+    let currentChart = null; // To hold the chart instance
 
     // --- Page Elements ---
     const landingPage = document.getElementById('landing-page');
@@ -44,153 +45,252 @@ document.addEventListener('DOMContentLoaded', function () {
                     <p class="text-slate-400 text-sm">Risk (${riskCategory})</p>
                     <p class="font-semibold text-lg ${riskColorClass}">${riskPercentage}%</p>
                 </div>`;
-            item.addEventListener('click', () => { createCibilReport(applicantId); showPage(reportPage); });
+            item.addEventListener('click', () => { createDossierReport(applicantId); showPage(reportPage); });
             applicantListContainer.appendChild(item);
         });
     }
     
-    // --- Create CIBIL-Style Report (WITH ENHANCED ANIMATIONS) ---
-    function createCibilReport(applicantId) {
+    // --- Create RISKON DOSSIER REPORT ---
+    function createDossierReport(applicantId) {
+        if (currentChart) {
+            currentChart.destroy();
+        }
         const applicant = applicantsData[applicantId];
-        const latestRecord = applicant.history.length > 0 ? applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest) : { Predicted_Prob_Default: 0, Risk_Category: 'N/A' };
-        const today = new Date().toLocaleDateString('en-GB');
-
+        if (!applicant || !applicant.history) {
+            reportContentWrapper.innerHTML = `<p class="text-red-500">Error: Applicant data not found or is invalid for ID ${applicantId}.</p>`;
+            return;
+        }
+        const latestRecord = applicant.history.length > 0 ? applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest) : { Predicted_Prob_Default: 0.0, Risk_Category: 'N/A' };
+        
         const prob = latestRecord.Predicted_Prob_Default;
         let cibilScore;
         if (prob <= 0.15) { cibilScore = 780 + (1 - prob/0.15) * 120; } 
         else if (prob <= 0.70) { cibilScore = 650 + (1 - (prob - 0.15)/0.55) * 130; } 
         else { cibilScore = 300 + (1 - (prob - 0.70)/0.30) * 350; }
         cibilScore = Math.round(cibilScore);
-
-        const paymentHistoryHTML = applicant.history
-            .filter(h => h.Data_Type === "Historical")
-            .map(h => `<div class="info-pair"><span class="label">Month ${h.Month_Offset}:</span><span class="value">${h.Payment_Status}</span></div>`)
-            .join('');
         
         const riskColorClass = latestRecord.Risk_Category === 'Low' ? 'risk-low' : latestRecord.Risk_Category === 'Medium' ? 'risk-medium' : 'risk-high';
+        const paymentHistoryHTML = applicant.history
+            .filter(h => h.Data_Type === "Historical")
+            .map(h => {
+                const statusClass = h.Payment_Status.includes('late') ? 'risk-high' : h.Payment_Status.includes('early') ? 'risk-low' : '';
+                return `<div class="info-pair"><span class="label">Month ${h.Month_Offset}:</span><span class="value ${statusClass}">${h.Payment_Status}</span></div>`;
+            })
+            .join('');
 
         const reportHTML = `
             <div id="report-page-container" class="report-container" style="opacity: 0;">
                 <div class="report-header">
-                    <h1>RISKON&trade; Intelligence Report</h1>
+                    <div>
+                        <h1>RISKON&trade; Digital Dossier</h1>
+                        <p class="text-gray-400">Applicant ID: ${applicantId} | Name: ${applicant.personal.name}</p>
+                    </div>
                     <div class="report-info">
-                        <strong>Applicant ID:</strong> ${applicantId}<br>
-                        <strong>Report Date:</strong> ${today}
+                        <strong>Generated:</strong> ${new Date().toLocaleDateString('en-GB')}<br>
+                        <strong>Control:</strong> RKN${applicantId}
                     </div>
                 </div>
 
-                <div class="section grid-2-col">
-                    <div class="report-section">
-                        <h3 class="report-section-title">Personal Details</h3>
-                        <div class="info-pair"><span class="label">Name:</span> <span class="value">${applicant.personal.name}</span></div>
-                        <div class="info-pair"><span class="label">Date of Birth:</span> <span class="value">${applicant.personal.dob}</span></div>
-                        <div class="info-pair"><span class="label">Gender:</span> <span class="value">${applicant.personal.gender}</span></div>
-                    </div>
-                     <div class="report-section">
-                        <h3 class="report-section-title">RISKON Score</h3>
-                         <div class="score-box">
-                            <div id="cibil-score-span" class="score-value ${riskColorClass}">300</div>
-                            <div class="score-label">CIBIL Equivalent</div>
+                <div class="tab-nav">
+                    <button class="tab-button active" data-tab="dashboard">Risk Dashboard</button>
+                    <button class="tab-button" data-tab="ledger">Payment Ledger</button>
+                    <button class="tab-button" data-tab="insights">AI Insights</button>
+                </div>
+
+                <!-- TAB 1: DASHBOARD -->
+                <div id="tab-dashboard" class="tab-content active">
+                    <div class="report-section mt-6">
+                        <div class="grid-3-col">
+                             <div class="kpi-card">
+                                <p class="label">RISKON Category</p>
+                                <p class="value ${riskColorClass}">${latestRecord.Risk_Category}</p>
+                            </div>
+                             <div class="kpi-card">
+                                <p class="label">Default Probability</p>
+                                <p class="value">${(prob * 100).toFixed(2)}%</p>
+                            </div>
+                             <div class="kpi-card">
+                                <p class="label">CIBIL Equivalent</p>
+                                <p class="value">${cibilScore}</p>
+                            </div>
+                        </div>
+                         <div id="interactive-graph-container">
+                            <canvas id="interactive-graph-canvas"></canvas>
                         </div>
                     </div>
                 </div>
 
-                 <div class="section report-section">
-                    <h3 class="report-section-title">RISK ANALYSIS & TRACKING</h3>
-                     <div class="graph-container">
-                        <img src="${applicant.graphImage}" alt="Risk Trend Graph for Applicant ${applicantId}">
-                    </div>
-                </div>
-
-                <div class="section report-section">
-                    <h3 class="report-section-title">CREDIT ACCOUNT & PAYMENT HISTORY</h3>
-                    <div class="payment-history-grid">
-                        ${paymentHistoryHTML || '<p>No historical payments found.</p>'}
+                <!-- TAB 2: LEDGER -->
+                <div id="tab-ledger" class="tab-content">
+                    <div class="report-section mt-6">
+                        <h3 class="report-section-title">Detailed Payment History</h3>
+                        <div class="report-section-content payment-ledger-grid">
+                            ${paymentHistoryHTML || '<p>No historical payments found.</p>'}
+                        </div>
                     </div>
                 </div>
                 
-                <div class="report-generation-section">
-                     <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
-                        Generate AI Summary
-                    </button>
-                    <div id="ai-summary-container" class="hidden mt-6">
-                        <div class="report-section">
-                            <h3 class="report-section-title">AI-POWERED SUMMARY (GEMINI-STYLE)</h3>
-                            <div class="report-section-content">
-                                <p id="ai-summary-text" class="text-base leading-relaxed text-gray-300"></p>
+                <!-- TAB 3: INSIGHTS -->
+                <div id="tab-insights" class="tab-content">
+                     <div class="report-section mt-6">
+                        <h3 class="report-section-title">AI-POWERED SUMMARY</h3>
+                        <div class="report-section-content">
+                            <div id="ai-summary-content">
+                                <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
+                                    Generate Live Insights with Gemini
+                                </button>
+                            </div>
+                            <div id="pdf-download-area" class="hidden mt-4">
+                               <button id="download-pdf-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
+                                    Download Full Report as PDF
+                                </button>
                             </div>
                         </div>
-                        <button id="download-pdf-btn" class="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
-                            Download as PDF
-                        </button>
                     </div>
                 </div>
             </div>`;
         
         reportContentWrapper.innerHTML = reportHTML;
-        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReportAsPDF(applicantId));
-
-        // --- GSAP ANIMATIONS FOR THE REPORT ---
-        const tl = gsap.timeline();
-        const scoreCounter = { value: 300 };
         
-        tl.to("#report-page-container", { opacity: 1, duration: 0.5 })
-          .to(scoreCounter, { 
-              value: cibilScore, 
-              duration: 1.5, 
-              ease: "power2.out",
-              onUpdate: () => {
-                  document.getElementById("cibil-score-span").textContent = Math.round(scoreCounter.value);
-              }
-          }, "-=0.2")
-          .from(".section", { opacity: 0, y: 30, stagger: 0.2, duration: 0.6 }, "-=1.2")
-          .from(".graph-container img", { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, "-=0.8");
+        setupTabs();
+        animateInteractiveGraph(applicantId);
+        gsap.from("#report-page-container", { opacity: 0, duration: 0.5 });
+        gsap.from(".kpi-card", { opacity: 0, y: 30, stagger: 0.15, duration: 0.5, delay: 0.2 });
     }
 
-    // --- Handle Report Generation Click ---
-    window.handleGenerateReport = function(applicantId) {
-        const applicant = applicantsData[applicantId];
-        const summaryContainer = document.getElementById('ai-summary-container');
-        const summaryContent = document.getElementById('ai-summary-text');
-        const generateBtn = document.getElementById('generate-report-btn');
-
-        summaryContent.textContent = "";
-        summaryContainer.classList.remove('hidden');
-        gsap.set(summaryContainer, { height: 'auto', opacity: 1 });
-        gsap.from(summaryContainer, { height: 0, opacity: 0, duration: 0.6, ease: 'power2.out' });
-        
-        generateBtn.style.display = 'none';
-
-        setTimeout(() => { // Simulate API call delay
-            const summary = applicant.geminiSummary;
-            let i = 0;
-            function typeWriter() {
-                if (i < summary.length) {
-                    summaryContent.innerHTML += summary.charAt(i);
-                    i++;
-                    setTimeout(typeWriter, 15);
-                }
-            }
-            typeWriter();
-        }, 800);
-    }
-
-    // --- Handle PDF Download ---
-    function downloadReportAsPDF(applicantId) {
-        const reportElement = document.getElementById('report-page-container');
-        const options = { margin: 0, filename: `RISKON_Report_${applicantId}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, backgroundColor: '#1f2937' }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
-        
-        const genBtn = reportElement.querySelector('#generate-report-btn');
-        const pdfBtn = reportElement.querySelector('#download-pdf-btn');
-        if(genBtn) genBtn.style.display = 'none';
-        if(pdfBtn) pdfBtn.style.display = 'none';
-
-        html2pdf().from(reportElement).set(options).save().then(() => {
-            if(pdfBtn) pdfBtn.style.display = 'inline-block';
+    function setupTabs() {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                const tabId = button.getAttribute('data-tab');
+                tabContents.forEach(content => {
+                    content.classList.toggle('active', content.id === `tab-${tabId}`);
+                });
+            });
         });
     }
 
-    // --- Landing Page Animations ---
+    function animateInteractiveGraph(applicantId) {
+        const canvas = document.getElementById('interactive-graph-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const applicant = applicantsData[applicantId];
+        const history = applicant.history.filter(h => h.Data_Type === 'Historical').sort((a,b) => a.Month_Offset - b.Month_Offset);
+
+        if (history.length < 1) return;
+
+        const labels = history.map(p => `Month ${p.Month_Offset}`);
+        const data = history.map(p => p.Predicted_Prob_Default * 100);
+
+        const riskColor = history[history.length-1].Risk_Category === 'Low' ? '#22c55e' : history[history.length-1].Risk_Category === 'Medium' ? '#f59e0b' : '#ef4444';
+
+        currentChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Default Probability (%)',
+                    data: data,
+                    borderColor: riskColor,
+                    backgroundColor: 'transparent',
+                    tension: 0.4,
+                    pointBackgroundColor: riskColor,
+                    pointHoverRadius: 8,
+                    pointHoverBackgroundColor: '#ffffff',
+                    pointHoverBorderColor: riskColor,
+                    pointHoverBorderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 2000,
+                    easing: 'easeInOutQuart'
+                },
+                scales: {
+                    y: { beginAtZero: true, max: 100, ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+                    x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: '#1f2937',
+                        titleColor: '#ffffff',
+                        bodyColor: '#e5e7eb',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: function(context) { return `Risk: ${context.parsed.y.toFixed(2)}%`; }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    window.handleGenerateReport = async function(applicantId) {
+        const applicantData = applicantsData[applicantId];
+        const summaryContent = document.getElementById('ai-summary-content');
+        const generateBtn = document.getElementById('generate-report-btn');
+        const pdfArea = document.getElementById('pdf-download-area');
+
+        generateBtn.style.display = 'none';
+        summaryContent.innerHTML = `<div class="loader"></div> <p class="text-gray-400">Contacting Gemini for live analysis...</p>`;
+
+        try {
+            const response = await fetch('/api/generate-summary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ applicantData }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'The API returned an error.');
+            }
+
+            const data = await response.json();
+            const summary = data.summary;
+            summaryContent.innerHTML = `<p id="ai-summary-text"></p>`;
+            const p = summaryContent.querySelector('p');
+            
+            let i = 0;
+            function typeWriter() {
+                if (i < summary.length) {
+                    p.innerHTML += summary.charAt(i);
+                    i++;
+                    setTimeout(typeWriter, 15);
+                } else {
+                    pdfArea.classList.remove('hidden');
+                    gsap.from(pdfArea, { opacity: 0, y: 10, duration: 0.5 });
+                }
+            }
+            typeWriter();
+
+        } catch (error) {
+            summaryContent.innerHTML = `<p class="text-red-400">Error: Could not connect to the Gemini API. This may be due to a missing API key during deployment. Please see INSTRUCTIONS.md.</p><p class="text-xs text-gray-500 mt-2">${error.message}</p>`;
+        }
+    }
+
+    function downloadReportAsPDF(applicantId) {
+        const reportElement = document.getElementById('report-page-container');
+        const options = { margin: 0, filename: `RISKON_Report_${applicantId}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, backgroundColor: '#111827' }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+        
+        const pdfBtn = reportElement.querySelector('#download-pdf-btn');
+        const originalDisplay = pdfBtn.style.display;
+        pdfBtn.style.display = 'none';
+
+        html2pdf().from(reportElement).set(options).save().then(() => {
+            pdfBtn.style.display = 'block';
+        });
+    }
+
     let heroScene, heroCamera, heroRenderer, heroParticles;
     function initHeroAnimation() {
         const container = document.getElementById('hero-animation');
@@ -246,12 +346,12 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('resize', () => { if(heroRenderer) { heroCamera.aspect = window.innerWidth / window.innerHeight; heroCamera.updateProjectionMatrix(); heroRenderer.setSize(window.innerWidth, window.innerHeight); } }, false);
     initHeroAnimation();
     
-    // --- NEW "ASSEMBLING PIPELINE" ANIMATION ---
+    // --- SOLUTION ANIMATION: 3D DATA FUNNEL ---
     const solutionStepsData = [ { title: "Data Engineering", description: "From raw, complex data sources to actionable, time-series insights." }, { title: "Feature Preprocessing", description: "Utilizing Weight of Evidence (WoE) and Information Value (IV) for powerful feature selection." }, { title: "Cohort Discovery", description: "Personalized risk assessment by segmenting borrowers into financial archetypes using K-Means clustering." }, { title: "Dynamic Calibration", description: "Solving Ordinary Differential Equations (ODEs) to model dynamic risk factors." }, { title: "Final Model Training", description: "Training cohort-specific ElasticNet models for maximum accuracy and fairness." } ];
     const stepsContainer = document.getElementById('solution-steps');
     solutionStepsData.forEach((step, i) => { stepsContainer.innerHTML += `<div class="step-content" id="step-${i}"><h3 class="text-3xl font-bold mb-3">${step.title}</h3><p class="text-slate-400">${step.description}</p></div>`; });
     
-    let vizScene, vizCamera, vizRenderer, tube, nodes = [], head;
+    let vizScene, vizCamera, vizRenderer, particles, funnel;
     
     function initSolutionViz() {
         const container = document.getElementById('solution-viz');
@@ -261,39 +361,37 @@ document.addEventListener('DOMContentLoaded', function () {
         vizRenderer = new THREE.WebGLRenderer({ alpha: true });
         vizRenderer.setSize(container.clientWidth, container.clientHeight);
         container.appendChild(vizRenderer.domElement);
-        vizCamera.position.set(0, 0, 12);
+        vizCamera.position.set(0, 0, 15);
 
-        const curve = new THREE.CatmullRomCurve3([
-            new THREE.Vector3(0, 8, 0), new THREE.Vector3(4, 4, 0),
-            new THREE.Vector3(-4, 0, 0), new THREE.Vector3(4, -4, 0),
-            new THREE.Vector3(0, -8, 0)
-        ]);
+        const particleGeo = new THREE.BufferGeometry();
+        const particleCount = 2000;
+        const posArray = new Float32Array(particleCount * 3);
+        const colorArray = new Float32Array(particleCount * 3);
 
-        const tubeGeo = new THREE.TubeGeometry(curve, 128, 0.1, 8, false);
-        const tubeMat = new THREE.MeshBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.3 });
-        tube = new THREE.Mesh(tubeGeo, tubeMat);
-        vizScene.add(tube);
-        
-        const headGeo = new THREE.SphereGeometry(0.3, 32, 32);
-        const headMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x3b82f6, metalness: 0.5, roughness: 0.2 });
-        head = new THREE.Mesh(headGeo, headMat);
-        vizScene.add(head);
-
-        const nodeGeo = new THREE.SphereGeometry(0.4, 32, 32);
-        for(let i = 0; i < 5; i++) {
-            const nodeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, emissive: 0x1e293b, metalness: 0.8, roughness: 0.4 });
-            const node = new THREE.Mesh(nodeGeo, nodeMat);
-            node.position.copy(curve.getPoint(i / 4));
-            nodes.push(node);
-            vizScene.add(node);
+        for(let i=0; i < particleCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 20;
         }
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        particleGeo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
 
-        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-        pointLight.position.set(0, 0, 5);
-        vizScene.add(pointLight);
-        vizScene.add(new THREE.AmbientLight(0xffffff, 0.2));
+        const particleMat = new THREE.PointsMaterial({ size: 0.05, vertexColors: true });
+        particles = new THREE.Points(particleGeo, particleMat);
+        vizScene.add(particles);
 
-        gsap.timeline({
+        const funnelGeo = new THREE.CylinderGeometry(0.1, 2, 8, 32, 1, true);
+        const funnelMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true, transparent: true, opacity: 0.3 });
+        funnel = new THREE.Mesh(funnelGeo, funnelMat);
+        funnel.position.y = 2;
+        funnel.visible = false;
+        vizScene.add(funnel);
+
+        const crystalGeo = new THREE.IcosahedronGeometry(2, 0);
+        const crystalMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x3b82f6, roughness: 0.2, metalness: 0.8, transparent: true, opacity: 0 });
+        const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+        crystal.position.y = -6;
+        vizScene.add(crystal);
+
+        const tl = gsap.timeline({
             scrollTrigger: {
                 trigger: "#solution-section-container",
                 start: "top top",
@@ -301,35 +399,37 @@ document.addEventListener('DOMContentLoaded', function () {
                 scrub: 1,
                 onUpdate: (self) => {
                     const progress = self.progress;
-                    const point = curve.getPointAt(progress);
-                    head.position.copy(point);
-                    tube.geometry.setDrawRange(0, Math.floor(progress * tube.geometry.attributes.position.count));
+                    const stepProgress = Math.floor(progress * 5);
+                    const stepContents = document.querySelectorAll(".step-content");
+                    stepContents.forEach((step, i) => {
+                        step.classList.toggle('is-active', i === stepProgress);
+                    });
                 }
             }
         });
 
-        const stepContents = document.querySelectorAll(".step-content");
-        stepContents.forEach((step, i) => { 
-            ScrollTrigger.create({ 
-                trigger: step, 
-                start: "top center", 
-                end: "bottom center", 
-                toggleClass: "is-active",
-                onEnter: () => animateNode(i),
-                onEnterBack: () => animateNode(i),
-            }); 
-        });
+        tl.to(particles.position, { y: 0, duration: 0.1 }) // Phase 0: Data Engineering
+         .to(particles.position, { y: -4, duration: 0.2 }, "+=0.05") // Phase 1: Preprocessing
+         .call(() => { funnel.visible = true; }, null, ">")
+         .to(funnel.material, { opacity: 0.7, duration: 0.05 }, "<")
+         .to(particles.rotation, { z: Math.PI * 2, duration: 0.2 }) // Phase 2: Cohort Discovery
+         .call(() => {
+            const colors = particles.geometry.attributes.color.array;
+            for(let i=0; i<particleCount; i++){
+                const cohort = Math.random();
+                if (cohort < 0.33) new THREE.Color(0x22c55e).toArray(colors, i*3);
+                else if (cohort < 0.66) new THREE.Color(0xf59e0b).toArray(colors, i*3);
+                else new THREE.Color(0xef4444).toArray(colors, i*3);
+            }
+            particles.geometry.attributes.color.needsUpdate = true;
+         }, null, ">")
+         .to(particles.position, { y: -8, duration: 0.2 }) // Phase 3: Calibration
+         .to(funnel.material, { opacity: 0, duration: 0.05 }, "<")
+         .call(() => { funnel.visible = false; }, null, ">")
+         .to(crystal.material, { opacity: 0.8, duration: 0.1 }) // Phase 4: Final Model
+         .to(particles.material, { opacity: 0, duration: 0.1 }, "<");
 
         animateViz();
-    }
-
-    function animateNode(index) {
-        nodes.forEach((node, i) => {
-            const isActive = i === index;
-            gsap.to(node.material.color, { r: isActive ? 59/255 : 148/255, g: isActive ? 130/255 : 163/255, b: isActive ? 246/255 : 184/255, duration: 0.5 });
-            gsap.to(node.material, { emissiveIntensity: isActive ? 1 : 0, duration: 0.5 });
-            gsap.to(node.scale, { x: isActive ? 1.5 : 1, y: isActive ? 1.5 : 1, z: isActive ? 1.5 : 1, duration: 0.5, ease: "back.out(1.7)" });
-        });
     }
 
     function animateViz() {
