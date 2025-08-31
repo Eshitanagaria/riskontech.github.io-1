@@ -28,10 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
         applicantListContainer.innerHTML = '';
         Object.keys(applicantsData).forEach(applicantId => {
             const applicant = applicantsData[applicantId];
-            const latestRecord = (applicant.history && applicant.history.length > 0)
-                ? applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest)
-                : { Predicted_Prob_Default: 0, Risk_Category: 'N/A' };
-
+            const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
             const riskPercentage = (latestRecord.Predicted_Prob_Default * 100).toFixed(2);
             const riskCategory = latestRecord.Risk_Category;
             const riskColorClass = riskCategory === 'Low' ? 'text-green-400' : riskCategory === 'Medium' ? 'text-yellow-400' : 'text-red-400';
@@ -55,13 +52,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Create RISKON Themed "Dossier" Report ---
     function createDossierReport(applicantId) {
         const applicant = applicantsData[applicantId];
-
-        if (!applicant || !applicant.history || applicant.history.length === 0) {
-            reportContentWrapper.innerHTML = `<div class="report-container"><p class="text-red-400 text-center text-lg p-10">Error: Critical data missing for applicant ${applicantId}. Cannot generate report.</p></div>`;
-            gsap.from(reportContentWrapper, {opacity: 0, y: 20, duration: 0.5});
-            return;
-        }
-
         const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
         
         const prob = latestRecord.Predicted_Prob_Default;
@@ -73,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const riskColorClass = latestRecord.Risk_Category === 'Low' ? 'risk-low' : latestRecord.Risk_Category === 'Medium' ? 'risk-medium' : 'risk-high';
         const paymentHistoryHTML = applicant.history
-            .filter(h => h.Data_Type === "Historical")
             .map(h => {
                 const statusClass = h.Payment_Status.includes('late') ? 'risk-high' : h.Payment_Status.includes('early') ? 'risk-low' : '';
                 return `<div class="info-pair"><span class="label">Month ${h.Month_Offset}:</span><span class="value ${statusClass}">${h.Payment_Status}</span></div>`;
@@ -101,24 +90,20 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                      <div class="report-section">
                         <h3 class="report-section-title">RISKON Score</h3>
-                        <div class="score-gauge-container">
-                            <svg class="score-gauge-svg" viewBox="0 0 200 100">
-                                <circle class="score-gauge-track" pathLength="100"></circle>
-                                <circle id="score-gauge-bar" class="score-gauge-bar ${riskColorClass}" pathLength="100"></circle>
-                            </svg>
-                            <div class="score-gauge-text">
-                                <div id="cibil-score-span" class="score-value ${riskColorClass}">300</div>
-                                <div class="score-label">CIBIL Equivalent</div>
-                            </div>
+                         <div class="score-box">
+                            <div id="cibil-score-span" class="score-value ${riskColorClass}">300</div>
+                            <div class="score-label">CIBIL Equivalent</div>
                         </div>
                     </div>
                 </div>
 
                  <div class="section report-section">
                     <h3 class="report-section-title">RISK ANALYSIS & TRACKING</h3>
-                     <div class="graph-container">
-                        <img src="${applicant.graphImage}" alt="Risk Trend Graph for Applicant ${applicantId}">
-                    </div>
+                     <div class="report-section-content">
+                         <div class="graph-container">
+                            <img src="${applicant.graphImage}" alt="Risk Trend Graph for Applicant ${applicantId}">
+                        </div>
+                     </div>
                 </div>
 
                 <div class="section report-section">
@@ -153,12 +138,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // --- GSAP ANIMATIONS FOR THE REPORT ---
         const tl = gsap.timeline();
         const scoreCounter = { value: 300 };
-        const gaugeBar = document.getElementById('score-gauge-bar');
-        const scorePercentage = (cibilScore - 300) / 600; // Score range 300-900
-        const dashOffset = 100 * (1 - scorePercentage);
-        
-        gaugeBar.style.strokeDasharray = 100;
-        gaugeBar.style.strokeDashoffset = 100;
         
         tl.to("#report-page-container", { opacity: 1, duration: 0.5 })
           .to(scoreCounter, { 
@@ -169,11 +148,6 @@ document.addEventListener('DOMContentLoaded', function () {
                   document.getElementById("cibil-score-span").textContent = Math.round(scoreCounter.value);
               }
           }, "-=0.2")
-          .to(gaugeBar, { 
-              strokeDashoffset: dashOffset, 
-              duration: 1.5, 
-              ease: "power2.out" 
-          }, "<")
           .from(".section", { opacity: 0, y: 30, stagger: 0.2, duration: 0.6 }, "-=1.2")
           .from(".graph-container img", { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, "-=0.8");
     }
@@ -192,9 +166,8 @@ document.addEventListener('DOMContentLoaded', function () {
         
         generateBtn.style.display = 'none';
 
-        // Simulate API call delay and then type out the summary
         setTimeout(() => {
-            const summary = applicant.geminiSummary; // Using the pre-written summary
+            const summary = applicant.geminiSummary;
             let i = 0;
             function typeWriter() {
                 if (i < summary.length) {
@@ -210,18 +183,14 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Handle PDF Download (FIXED) ---
     function downloadReportAsPDF(applicantId) {
         const reportElement = document.getElementById('report-page-container');
-        
-        // Clone the element to preserve the original page state
         const elementToPrint = reportElement.cloneNode(true);
-        elementToPrint.style.opacity = 1; // Make sure it's visible for printing
+        elementToPrint.style.opacity = 1;
         
-        // Hide buttons in the cloned element
         const btn1 = elementToPrint.querySelector('#generate-report-btn');
         const btn2 = elementToPrint.querySelector('#download-pdf-btn');
         if(btn1) btn1.style.display = 'none';
         if(btn2) btn2.style.display = 'none';
         
-        // Temporarily append clone to body for rendering, but make it invisible
         elementToPrint.style.position = 'absolute';
         elementToPrint.style.left = '-9999px';
         document.body.appendChild(elementToPrint);
@@ -229,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const options = { margin: 0, filename: `RISKON_Report_${applicantId}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
 
         html2pdf().from(elementToPrint).set(options).save().then(() => {
-            document.body.removeChild(elementToPrint); // Clean up by removing the clone
+            document.body.removeChild(elementToPrint);
         });
     }
 
@@ -240,17 +209,12 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('resize', () => { if(heroRenderer) { /* ... */ } }, false);
     initHeroAnimation();
     
-    // --- NEW "DATA JOURNEY" ANIMATION ---
-    const solutionStepsData = [ 
-        { title: "Stage 1 - Ingestion", description: "We take in the chaos." }, 
-        { title: "Stage 2 - Processing", description: "We process and structure information." }, 
-        { title: "Stage 3 - Intelligence", description: "We learn from the patterns." }, 
-        { title: "Stage 4 - Prediction", description: "We predict risk, before it strikes." } 
-    ];
+    // --- "ASSEMBLING PIPELINE" ANIMATION ---
+    const solutionStepsData = [ { title: "Stage 1 - Ingestion", description: "We take in the chaos." }, { title: "Stage 2 - Processing", description: "We process and structure information." }, { title: "Stage 3 - Intelligence", description: "We learn from the patterns." }, { title: "Stage 4 - Prediction", description: "We predict risk, before it strikes." } ];
     const stepsContainer = document.getElementById('solution-steps');
     solutionStepsData.forEach((step, i) => { stepsContainer.innerHTML += `<div class="step-content" id="step-${i}"><h3 class="text-3xl font-bold mb-3">${step.title}</h3><p class="text-slate-400 text-lg">${step.description}</p></div>`; });
     
-    let vizScene, vizCamera, vizRenderer, particles, lines, nodes, dashboard;
+    let vizScene, vizCamera, vizRenderer, tube, nodes = [], head;
     
     function initSolutionViz() {
         const container = document.getElementById('solution-viz');
@@ -260,37 +224,39 @@ document.addEventListener('DOMContentLoaded', function () {
         vizRenderer = new THREE.WebGLRenderer({ alpha: true });
         vizRenderer.setSize(container.clientWidth, container.clientHeight);
         container.appendChild(vizRenderer.domElement);
-        vizCamera.position.set(0, 0, 15);
+        vizCamera.position.set(0, 0, 12);
 
-        // Particles
-        const particleGeo = new THREE.BufferGeometry();
-        const particleCount = 2000;
-        const posArray = new Float32Array(particleCount * 3);
-        for(let i=0; i < particleCount * 3; i++) { posArray[i] = (Math.random() - 0.5) * 20; }
-        particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const particleMat = new THREE.PointsMaterial({ size: 0.05, color: 0x94a3b8 });
-        particles = new THREE.Points(particleGeo, particleMat);
-        vizScene.add(particles);
+        const curve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0, 8, 0), new THREE.Vector3(4, 4, 0),
+            new THREE.Vector3(-4, 0, 0), new THREE.Vector3(4, -4, 0),
+            new THREE.Vector3(0, -8, 0)
+        ]);
 
-        // Lines (for tubes)
-        const lineGeo = new THREE.BufferGeometry();
-        const linePos = new Float32Array(200 * 3);
-        lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
-        const lineMat = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0 });
-        lines = new THREE.Line(lineGeo, lineMat);
-        vizScene.add(lines);
+        const tubeGeo = new THREE.TubeGeometry(curve, 128, 0.1, 8, false);
+        const tubeMat = new THREE.MeshBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.3 });
+        tube = new THREE.Mesh(tubeGeo, tubeMat);
+        vizScene.add(tube);
         
-        // Nodes (for clusters)
-        nodes = new THREE.Group();
-        vizScene.add(nodes);
+        const headGeo = new THREE.SphereGeometry(0.3, 32, 32);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x3b82f6, metalness: 0.5, roughness: 0.2 });
+        head = new THREE.Mesh(headGeo, headMat);
+        vizScene.add(head);
 
-        // Dashboard
-        const dashGeo = new THREE.PlaneGeometry(8, 5);
-        const dashMat = new THREE.MeshBasicMaterial({ color: 0x1f2937, transparent: true, opacity: 0, side: THREE.DoubleSide });
-        dashboard = new THREE.Mesh(dashGeo, dashMat);
-        vizScene.add(dashboard);
+        const nodeGeo = new THREE.SphereGeometry(0.4, 32, 32);
+        for(let i = 0; i < 5; i++) {
+            const nodeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, emissive: 0x1e293b, metalness: 0.8, roughness: 0.4 });
+            const node = new THREE.Mesh(nodeGeo, nodeMat);
+            node.position.copy(curve.getPoint(i / 4));
+            nodes.push(node);
+            vizScene.add(node);
+        }
 
-        const tl = gsap.timeline({
+        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+        pointLight.position.set(0, 0, 5);
+        vizScene.add(pointLight);
+        vizScene.add(new THREE.AmbientLight(0xffffff, 0.2));
+
+        gsap.timeline({
             scrollTrigger: {
                 trigger: "#solution-section-container",
                 start: "top top",
@@ -298,62 +264,40 @@ document.addEventListener('DOMContentLoaded', function () {
                 scrub: 1,
                 onUpdate: (self) => {
                     const progress = self.progress;
-                    const stepProgress = Math.floor(progress * solutionStepsData.length);
-                    const stepContents = document.querySelectorAll(".step-content");
-                    stepContents.forEach((step, i) => {
-                        step.classList.toggle('is-active', i === stepProgress);
-                    });
+                    const point = curve.getPointAt(progress);
+                    head.position.copy(point);
+                    tube.geometry.setDrawRange(0, Math.floor(progress * tube.geometry.attributes.position.count));
                 }
             }
         });
 
-        // Stage 1: Ingestion
-        tl.to(particles.position, { x: 0, y: 0, z: -5, duration: 0.2 });
-        tl.to(particles.scale, { x: 0.2, y: 0.2, z: 0.2, duration: 0.2 }, "<");
-        
-        // Stage 2: Processing
-        tl.to(lines.material, { opacity: 1, duration: 0.05 });
-        tl.to(particles.scale, { x: 0, y: 0, z: 0, duration: 0.05 }, "<");
-        
-        // Stage 3: Intelligence
-        tl.to(lines.material, { opacity: 0, duration: 0.05 });
-        tl.call(() => {
-            const positions = particles.geometry.attributes.position.array;
-            for(let i=0; i<particleCount; i++) {
-                const cluster = Math.floor(Math.random() * 3);
-                positions[i*3] = (cluster-1)*4 + (Math.random()-0.5)*2;
-                positions[i*3+1] = (Math.random()-0.5)*2;
-                positions[i*3+2] = (Math.random()-0.5)*2;
-            }
-            particles.geometry.attributes.position.needsUpdate = true;
+        const stepContents = document.querySelectorAll(".step-content");
+        stepContents.forEach((step, i) => { 
+            ScrollTrigger.create({ 
+                trigger: step, 
+                start: "top center", 
+                end: "bottom center", 
+                toggleClass: "is-active",
+                onEnter: () => animateNode(i),
+                onEnterBack: () => animateNode(i),
+            }); 
         });
-        tl.to(particles.scale, { x: 1, y: 1, z: 1, duration: 0.1 });
-        
-        // Stage 4: Prediction
-        tl.to(particles.scale, { x: 0, y: 0, z: 0, duration: 0.1 });
-        tl.to(dashboard.scale, { x: 1, y: 1, z: 1, duration: 0.1 }, "<");
-        tl.to(dashboard.material, { opacity: 0.8, duration: 0.1 }, "<");
 
         animateViz();
     }
 
+    function animateNode(index) {
+        nodes.forEach((node, i) => {
+            const isActive = i === index;
+            gsap.to(node.material.color, { r: isActive ? 59/255 : 148/255, g: isActive ? 130/255 : 163/255, b: isActive ? 246/255 : 184/255, duration: 0.5 });
+            gsap.to(node.material, { emissiveIntensity: isActive ? 1 : 0, duration: 0.5 });
+            gsap.to(node.scale, { x: isActive ? 1.5 : 1, y: isActive ? 1.5 : 1, z: isActive ? 1.5 : 1, duration: 0.5, ease: "back.out(1.7)" });
+        });
+    }
+
     function animateViz() {
         requestAnimationFrame(animateViz);
-        if (vizRenderer) {
-            if (lines) {
-                 const linePos = lines.geometry.attributes.position.array;
-                 const t = Date.now() * 0.001;
-                 for (let i = 0; i < 200; i++) {
-                     const i3 = i * 3;
-                     const progress = i/199;
-                     linePos[i3] = Math.cos(t + progress * 10) * (3 - progress * 3);
-                     linePos[i3+1] = Math.sin(t + progress * 10) * (3 - progress * 3);
-                     linePos[i3+2] = (progress - 0.5) * 10;
-                 }
-                 lines.geometry.attributes.position.needsUpdate = true;
-            }
-            vizRenderer.render(vizScene, vizCamera);
-        }
+        if (vizRenderer) vizRenderer.render(vizScene, vizCamera);
     }
     
     initSolutionViz();
