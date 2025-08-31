@@ -63,7 +63,6 @@ body {
 /* --- NEW RISKON "DOSSIER" REPORT STYLES --- */
 .report-container {
     color: #d1d5db;
-    font-family: 'Inter', sans-serif;
 }
 .report-header {
     padding-bottom: 1rem;
@@ -102,71 +101,109 @@ body {
 .report-section-content {
     padding: 1.5rem;
 }
-.grid-2-col {
+.grid-3-col {
     display: grid;
     grid-template-columns: repeat(1, minmax(0, 1fr));
     gap: 1.5rem;
 }
-@media (min-width: 768px) {
-    .grid-2-col {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (min-width: 1024px) {
+    .grid-3-col {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
-.info-pair {
+.kpi-card {
+    background: #374151;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.kpi-card .label {
+    font-size: 0.875rem;
+    color: #9ca3af;
+    margin-bottom: 0.25rem;
+}
+.kpi-card .value {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+#interactive-graph-container {
+    position: relative;
+    width: 100%;
+    min-height: 400px;
+    margin-top: 1.5rem;
+}
+
+/* Tabs */
+.tab-nav {
     display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
     border-bottom: 1px solid #374151;
 }
-.info-pair:last-child {
-    border-bottom: none;
-}
-.info-pair .label {
-    font-weight: 500;
+.tab-button {
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    background: none;
+    border: none;
     color: #9ca3af;
+    font-weight: 500;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease-in-out;
 }
-.info-pair .value {
-    font-weight: 600;
-    color: #e5e7eb;
+.tab-button.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
 }
-.graph-container {
-    margin-top: 1.5rem;
-    border-radius: 0.5rem;
-    overflow: hidden;
+.tab-content {
+    display: none;
 }
-.graph-container img {
-    width: 100%;
-    height: auto;
-    border-radius: 0.5rem;
-    border: 1px solid #374151;
+.tab-content.active {
+    display: block;
 }
-.payment-history-grid {
+.payment-ledger-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1rem;
 }
-.payment-history-grid .info-pair {
+.payment-ledger-grid .info-pair {
     font-size: 0.875rem;
     padding: 0.75rem;
     background-color: #374151;
     border-radius: 0.375rem;
     border-bottom: none;
+    display: flex;
+    justify-content: space-between;
+}
+.payment-ledger-grid .info-pair .label {
+    font-weight: 500;
+    color: #9ca3af;
+}
+.payment-ledger-grid .info-pair .value {
+    font-weight: 600;
+    color: #e5e7eb;
 }
 
-/* Text-based Score */
-.score-box {
-    text-align: center;
-    padding: 1rem;
+/* AI Summary Loader */
+.loader {
+    width: 50px;
+    aspect-ratio: 1;
+    display: grid;
+    color: #3b82f6;
+    background: conic-gradient(from 180deg at 50% 50%,#0000,currentColor);
+    animation: l23 1s infinite linear;
+    margin-bottom: 1rem;
 }
-.score-box .score-value {
-    font-size: 4rem;
-    font-weight: 800;
-    line-height: 1;
+.loader:before,
+.loader:after {
+    content: "";
+    grid-area: 1/1;
+    background: inherit;
+    border: inherit;
+    border-radius: 50%;
 }
-.score-box .score-label {
-    font-size: 0.875rem;
-    color: #9ca3af;
-    margin-top: 0.25rem;
+.loader:before {
+    transform: rotate(45deg);
+}
+@keyframes l23 {
+  100% {transform: rotate(1turn)}
 }
 
 /* AI Summary Typing effect */
