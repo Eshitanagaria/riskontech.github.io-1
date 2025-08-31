@@ -29,7 +29,11 @@ document.addEventListener('DOMContentLoaded', function () {
         applicantListContainer.innerHTML = '';
         Object.keys(applicantsData).forEach(applicantId => {
             const applicant = applicantsData[applicantId];
-            const latestRecord = applicant.history.length > 0 ? applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest) : { Predicted_Prob_Default: 0, Risk_Category: 'N/A' };
+            // BUG FIX: Ensure history exists and is not empty before using reduce
+            const latestRecord = (applicant.history && applicant.history.length > 0)
+                ? applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest)
+                : { Predicted_Prob_Default: 0, Risk_Category: 'N/A' }; // Fallback
+
             const riskPercentage = (latestRecord.Predicted_Prob_Default * 100).toFixed(2);
             const riskCategory = latestRecord.Risk_Category;
             const riskColorClass = riskCategory === 'Low' ? 'text-green-400' : riskCategory === 'Medium' ? 'text-yellow-400' : 'text-red-400';
@@ -56,10 +60,14 @@ document.addEventListener('DOMContentLoaded', function () {
             currentChart.destroy();
         }
         const applicant = applicantsData[applicantId];
+
+        // BUG FIX: Check for applicant data and history existence at the very start.
         if (!applicant || !applicant.history || applicant.history.length === 0) {
-            reportContentWrapper.innerHTML = `<div class="report-container"><p class="text-red-500 text-center text-lg">Error: Critical data missing for applicant ${applicantId}. Cannot generate report.</p></div>`;
+            reportContentWrapper.innerHTML = `<div class="report-container"><p class="text-red-400 text-center text-lg p-10">Error: Critical data missing for applicant ${applicantId}. Cannot generate report.</p></div>`;
+            gsap.from(reportContentWrapper, {opacity: 0, y: 20, duration: 0.5});
             return;
         }
+
         const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
         
         const prob = latestRecord.Predicted_Prob_Default;
@@ -97,7 +105,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     <button class="tab-button" data-tab="insights">AI Insights</button>
                 </div>
 
-                <!-- TAB 1: DASHBOARD -->
                 <div id="tab-dashboard" class="tab-content active">
                     <div class="report-section mt-6">
                         <div class="grid-3-col">
@@ -120,7 +127,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 </div>
 
-                <!-- TAB 2: LEDGER -->
                 <div id="tab-ledger" class="tab-content">
                     <div class="report-section mt-6">
                         <h3 class="report-section-title">Detailed Payment History</h3>
@@ -130,7 +136,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 </div>
                 
-                <!-- TAB 3: INSIGHTS -->
                 <div id="tab-insights" class="tab-content">
                      <div class="report-section mt-6">
                         <h3 class="report-section-title">AI-POWERED SUMMARY</h3>
@@ -291,6 +296,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // --- Landing Page Animations ---
     let heroScene, heroCamera, heroRenderer, heroParticles;
     function initHeroAnimation() { /* ... [Unchanged Hero Animation Code] ... */ }
     function animateHero() { /* ... [Unchanged Hero Animation Code] ... */ }
