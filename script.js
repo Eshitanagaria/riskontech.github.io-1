@@ -49,206 +49,130 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
     
-    // --- Create RISKON Themed Report (WITH ENHANCED ANIMATIONS) ---
+    // --- Create CIBIL-Style Report (WITH ENHANCED ANIMATIONS) ---
     function createCibilReport(applicantId) {
         const applicant = applicantsData[applicantId];
         const latestRecord = applicant.history.length > 0 ? applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest) : { Predicted_Prob_Default: 0, Risk_Category: 'N/A' };
-        
+        const today = new Date().toLocaleDateString('en-GB');
+
         const prob = latestRecord.Predicted_Prob_Default;
         let cibilScore;
         if (prob <= 0.15) { cibilScore = 780 + (1 - prob/0.15) * 120; } 
         else if (prob <= 0.70) { cibilScore = 650 + (1 - (prob - 0.15)/0.55) * 130; } 
         else { cibilScore = 300 + (1 - (prob - 0.70)/0.30) * 350; }
         cibilScore = Math.round(cibilScore);
-        
-        const riskColorClass = latestRecord.Risk_Category === 'Low' ? 'risk-low' : latestRecord.Risk_Category === 'Medium' ? 'risk-medium' : 'risk-high';
+
         const paymentHistoryHTML = applicant.history
             .filter(h => h.Data_Type === "Historical")
-            .map(h => {
-                const statusClass = h.Payment_Status.includes('late') ? 'risk-high' : h.Payment_Status.includes('early') ? 'risk-low' : '';
-                return `<div class="info-pair"><span class="label">Month ${h.Month_Offset}:</span><span class="value ${statusClass}">${h.Payment_Status}</span></div>`;
-            })
+            .map(h => `<div class="info-pair"><span class="label">Month ${h.Month_Offset}:</span><span class="value">${h.Payment_Status}</span></div>`)
             .join('');
+        
+        const riskColorClass = latestRecord.Risk_Category === 'Low' ? 'risk-low' : latestRecord.Risk_Category === 'Medium' ? 'risk-medium' : 'risk-high';
 
         const reportHTML = `
             <div id="report-page-container" class="report-container" style="opacity: 0;">
                 <div class="report-header">
-                    <div>
-                        <h1>RISKON&trade; Digital Dossier</h1>
-                        <p class="text-gray-400">Applicant ID: ${applicantId} | Name: ${applicant.personal.name}</p>
-                    </div>
+                    <h1>RISKON&trade; Intelligence Report</h1>
                     <div class="report-info">
-                        <strong>Generated:</strong> ${new Date().toLocaleDateString('en-GB')}<br>
-                        <strong>Control:</strong> RKN${applicantId}
+                        <strong>Applicant ID:</strong> ${applicantId}<br>
+                        <strong>Report Date:</strong> ${today}
                     </div>
                 </div>
 
-                <div class="tab-nav">
-                    <button class="tab-button active" data-tab="dashboard">Risk Dashboard</button>
-                    <button class="tab-button" data-tab="ledger">Payment Ledger</button>
-                    <button class="tab-button" data-tab="insights">AI Insights</button>
-                </div>
-
-                <div id="tab-dashboard" class="tab-content active">
-                    <div class="report-section mt-6">
-                        <div class="grid-3-col">
-                             <div class="kpi-card">
-                                <p class="label">RISKON Category</p>
-                                <p class="value ${riskColorClass}">${latestRecord.Risk_Category}</p>
-                            </div>
-                             <div class="kpi-card">
-                                <p class="label">Default Probability</p>
-                                <p class="value">${(prob * 100).toFixed(2)}%</p>
-                            </div>
-                             <div class="kpi-card">
-                                <p class="label">CIBIL Equivalent</p>
-                                <p class="value">${cibilScore}</p>
-                            </div>
-                        </div>
-                         <div class="graph-canvas-container">
-                            <img src="${applicant.graphImage}" alt="Risk Trend Graph" />
-                            <canvas id="graph-animation-canvas"></canvas>
+                <div class="section grid-2-col">
+                    <div class="report-section">
+                        <h3 class="report-section-title">Personal Details</h3>
+                        <div class="info-pair"><span class="label">Name:</span> <span class="value">${applicant.personal.name}</span></div>
+                        <div class="info-pair"><span class="label">Date of Birth:</span> <span class="value">${applicant.personal.dob}</span></div>
+                        <div class="info-pair"><span class="label">Gender:</span> <span class="value">${applicant.personal.gender}</span></div>
+                    </div>
+                     <div class="report-section">
+                        <h3 class="report-section-title">RISKON Score</h3>
+                         <div class="score-box">
+                            <div id="cibil-score-span" class="score-value ${riskColorClass}">300</div>
+                            <div class="score-label">CIBIL Equivalent</div>
                         </div>
                     </div>
                 </div>
 
-                <div id="tab-ledger" class="tab-content">
-                    <div class="report-section mt-6">
-                        <h3 class="report-section-title">Detailed Payment History</h3>
-                        <div class="report-section-content payment-ledger-grid">
-                            ${paymentHistoryHTML || '<p>No historical payments found.</p>'}
-                        </div>
+                 <div class="section report-section">
+                    <h3 class="report-section-title">RISK ANALYSIS & TRACKING</h3>
+                     <div class="graph-container">
+                        <img src="${applicant.graphImage}" alt="Risk Trend Graph for Applicant ${applicantId}">
+                    </div>
+                </div>
+
+                <div class="section report-section">
+                    <h3 class="report-section-title">CREDIT ACCOUNT & PAYMENT HISTORY</h3>
+                    <div class="payment-history-grid">
+                        ${paymentHistoryHTML || '<p>No historical payments found.</p>'}
                     </div>
                 </div>
                 
-                <div id="tab-insights" class="tab-content">
-                     <div class="report-section mt-6">
-                        <h3 class="report-section-title">AI-POWERED SUMMARY (GEMINI-STYLE)</h3>
-                        <div class="report-section-content">
-                            <div id="ai-summary-content">
-                                <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
-                                    Generate Insights
-                                </button>
-                            </div>
-                            <div id="pdf-download-area" class="hidden mt-4">
-                               <button id="download-pdf-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
-                                    Download Full Report as PDF
-                                </button>
+                <div class="report-generation-section">
+                     <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
+                        Generate AI Summary
+                    </button>
+                    <div id="ai-summary-container" class="hidden mt-6">
+                        <div class="report-section">
+                            <h3 class="report-section-title">AI-POWERED SUMMARY (GEMINI-STYLE)</h3>
+                            <div class="report-section-content">
+                                <p id="ai-summary-text" class="text-base leading-relaxed text-gray-300"></p>
                             </div>
                         </div>
+                        <button id="download-pdf-btn" class="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
+                            Download as PDF
+                        </button>
                     </div>
                 </div>
             </div>`;
         
         reportContentWrapper.innerHTML = reportHTML;
+        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReportAsPDF(applicantId));
+
+        // --- GSAP ANIMATIONS FOR THE REPORT ---
+        const tl = gsap.timeline();
+        const scoreCounter = { value: 300 };
         
-        // --- SETUP AND ANIMATE REPORT ---
-        setupTabs();
-        animateGraph(applicantId);
-        gsap.from("#report-page-container", { opacity: 0, duration: 0.5 });
-        gsap.from(".kpi-card", { opacity: 0, y: 30, stagger: 0.15, duration: 0.5, delay: 0.2 });
-    }
-
-    function setupTabs() {
-        const tabButtons = document.querySelectorAll('.tab-button');
-        const tabContents = document.querySelectorAll('.tab-content');
-        tabButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                tabButtons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                const tabId = button.getAttribute('data-tab');
-                tabContents.forEach(content => {
-                    content.classList.toggle('active', content.id === `tab-${tabId}`);
-                });
-            });
-        });
-    }
-
-    function animateGraph(applicantId) {
-        const canvas = document.getElementById('graph-animation-canvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const applicant = applicantsData[applicantId];
-        const history = applicant.history.filter(h => h.Data_Type === 'Historical').sort((a,b) => a.Month_Offset - b.Month_Offset);
-
-        const parent = canvas.parentElement;
-        canvas.width = parent.clientWidth;
-        canvas.height = parent.clientHeight;
-
-        if (history.length < 2) return; // Need at least 2 points to draw a line
-
-        const points = history.map((p, i) => ({
-            x: (i / (history.length - 1)) * canvas.width,
-            y: (1 - p.Predicted_Prob_Default) * canvas.height
-        }));
-
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.5)'); // High risk color
-        gradient.addColorStop(0.5, 'rgba(245, 158, 11, 0.5)'); // Medium risk color
-        gradient.addColorStop(1, 'rgba(34, 197, 94, 0.5)'); // Low risk color
-        
-        const animationProgress = { val: 0 };
-        gsap.to(animationProgress, {
-            val: 1,
-            duration: 2,
-            ease: "power2.inOut",
-            delay: 0.5,
-            onUpdate: () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.beginPath();
-                ctx.moveTo(points[0].x, points[0].y);
-
-                const currentPointIndex = Math.floor((points.length - 1) * animationProgress.val);
-                for (let i = 1; i <= currentPointIndex; i++) {
-                    ctx.lineTo(points[i].x, points[i].y);
-                }
-                
-                if (currentPointIndex < points.length - 1) {
-                    const lastPoint = points[currentPointIndex];
-                    const nextPoint = points[currentPointIndex + 1];
-                    const segmentProgress = ((points.length - 1) * animationProgress.val) % 1;
-                    const interpolatedX = lastPoint.x + (nextPoint.x - lastPoint.x) * segmentProgress;
-                    const interpolatedY = lastPoint.y + (nextPoint.y - lastPoint.y) * segmentProgress;
-                    ctx.lineTo(interpolatedX, interpolatedY);
-                }
-
-                ctx.strokeStyle = '#3b82f6';
-                ctx.lineWidth = 3;
-                ctx.stroke();
-            }
-        });
+        tl.to("#report-page-container", { opacity: 1, duration: 0.5 })
+          .to(scoreCounter, { 
+              value: cibilScore, 
+              duration: 1.5, 
+              ease: "power2.out",
+              onUpdate: () => {
+                  document.getElementById("cibil-score-span").textContent = Math.round(scoreCounter.value);
+              }
+          }, "-=0.2")
+          .from(".section", { opacity: 0, y: 30, stagger: 0.2, duration: 0.6 }, "-=1.2")
+          .from(".graph-container img", { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, "-=0.8");
     }
 
     // --- Handle Report Generation Click ---
     window.handleGenerateReport = function(applicantId) {
         const applicant = applicantsData[applicantId];
-        const summaryContent = document.getElementById('ai-summary-content');
+        const summaryContainer = document.getElementById('ai-summary-container');
+        const summaryContent = document.getElementById('ai-summary-text');
         const generateBtn = document.getElementById('generate-report-btn');
-        const pdfArea = document.getElementById('pdf-download-area');
 
-        generateBtn.textContent = 'Analyzing...';
-        generateBtn.disabled = true;
+        summaryContent.textContent = "";
+        summaryContainer.classList.remove('hidden');
+        gsap.set(summaryContainer, { height: 'auto', opacity: 1 });
+        gsap.from(summaryContainer, { height: 0, opacity: 0, duration: 0.6, ease: 'power2.out' });
+        
+        generateBtn.style.display = 'none';
 
         setTimeout(() => { // Simulate API call delay
-            generateBtn.style.display = 'none';
             const summary = applicant.geminiSummary;
-            summaryContent.innerHTML = `<p></p>`;
-            const p = summaryContent.querySelector('p');
-            
             let i = 0;
             function typeWriter() {
                 if (i < summary.length) {
-                    p.innerHTML += summary.charAt(i);
+                    summaryContent.innerHTML += summary.charAt(i);
                     i++;
                     setTimeout(typeWriter, 15);
-                } else {
-                    p.style.borderRight = 'none';
-                    pdfArea.classList.remove('hidden');
-                    gsap.from(pdfArea, { opacity: 0, y: 10, duration: 0.5 });
                 }
             }
             typeWriter();
-        }, 1200);
+        }, 800);
     }
 
     // --- Handle PDF Download ---
@@ -256,12 +180,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const reportElement = document.getElementById('report-page-container');
         const options = { margin: 0, filename: `RISKON_Report_${applicantId}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, backgroundColor: '#1f2937' }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
         
-        const btnContainer = reportElement.querySelector('#pdf-download-area');
-        const originalDisplay = btnContainer.style.display;
-        btnContainer.style.display = 'none'; // Hide button for PDF
+        const genBtn = reportElement.querySelector('#generate-report-btn');
+        const pdfBtn = reportElement.querySelector('#download-pdf-btn');
+        if(genBtn) genBtn.style.display = 'none';
+        if(pdfBtn) pdfBtn.style.display = 'none';
 
         html2pdf().from(reportElement).set(options).save().then(() => {
-            btnContainer.style.display = originalDisplay; // Show it again
+            if(pdfBtn) pdfBtn.style.display = 'inline-block';
         });
     }
 
@@ -321,12 +246,12 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('resize', () => { if(heroRenderer) { heroCamera.aspect = window.innerWidth / window.innerHeight; heroCamera.updateProjectionMatrix(); heroRenderer.setSize(window.innerWidth, window.innerHeight); } }, false);
     initHeroAnimation();
     
-    // --- NEURAL NETWORK ANIMATION ---
+    // --- NEW "ASSEMBLING PIPELINE" ANIMATION ---
     const solutionStepsData = [ { title: "Data Engineering", description: "From raw, complex data sources to actionable, time-series insights." }, { title: "Feature Preprocessing", description: "Utilizing Weight of Evidence (WoE) and Information Value (IV) for powerful feature selection." }, { title: "Cohort Discovery", description: "Personalized risk assessment by segmenting borrowers into financial archetypes using K-Means clustering." }, { title: "Dynamic Calibration", description: "Solving Ordinary Differential Equations (ODEs) to model dynamic risk factors." }, { title: "Final Model Training", description: "Training cohort-specific ElasticNet models for maximum accuracy and fairness." } ];
     const stepsContainer = document.getElementById('solution-steps');
     solutionStepsData.forEach((step, i) => { stepsContainer.innerHTML += `<div class="step-content" id="step-${i}"><h3 class="text-3xl font-bold mb-3">${step.title}</h3><p class="text-slate-400">${step.description}</p></div>`; });
     
-    let vizScene, vizCamera, vizRenderer, nodes = [], lines = [];
+    let vizScene, vizCamera, vizRenderer, tube, nodes = [], head;
     
     function initSolutionViz() {
         const container = document.getElementById('solution-viz');
@@ -338,41 +263,37 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(vizRenderer.domElement);
         vizCamera.position.set(0, 0, 12);
 
-        const layers = [5, 7, 7, 4]; // Nodes per layer
-        const layerPositions = [];
-        const nodeGeo = new THREE.SphereGeometry(0.2, 16, 16);
-        
-        layers.forEach((count, i) => {
-            const layerX = (i - (layers.length - 1) / 2) * 4;
-            const layer = [];
-            for(let j = 0; j < count; j++) {
-                const nodeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2 });
-                const node = new THREE.Mesh(nodeGeo, nodeMat);
-                const nodeY = (j - (count - 1) / 2) * 1.5;
-                node.position.set(layerX, nodeY, 0);
-                nodes.push(node);
-                layer.push(node);
-                vizScene.add(node);
-            }
-            layerPositions.push(layer);
-        });
+        const curve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0, 8, 0), new THREE.Vector3(4, 4, 0),
+            new THREE.Vector3(-4, 0, 0), new THREE.Vector3(4, -4, 0),
+            new THREE.Vector3(0, -8, 0)
+        ]);
 
-        for(let i = 0; i < layerPositions.length - 1; i++) {
-            const currentLayer = layerPositions[i];
-            const nextLayer = layerPositions[i+1];
-            currentLayer.forEach(currentNode => {
-                nextLayer.forEach(nextNode => {
-                    const points = [currentNode.position, nextNode.position];
-                    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-                    const lineMat = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0 });
-                    const line = new THREE.Line(lineGeo, lineMat);
-                    lines.push(line);
-                    vizScene.add(line);
-                });
-            });
-        }
+        const tubeGeo = new THREE.TubeGeometry(curve, 128, 0.1, 8, false);
+        const tubeMat = new THREE.MeshBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.3 });
+        tube = new THREE.Mesh(tubeGeo, tubeMat);
+        vizScene.add(tube);
         
-        const tl = gsap.timeline({
+        const headGeo = new THREE.SphereGeometry(0.3, 32, 32);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x3b82f6, metalness: 0.5, roughness: 0.2 });
+        head = new THREE.Mesh(headGeo, headMat);
+        vizScene.add(head);
+
+        const nodeGeo = new THREE.SphereGeometry(0.4, 32, 32);
+        for(let i = 0; i < 5; i++) {
+            const nodeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, emissive: 0x1e293b, metalness: 0.8, roughness: 0.4 });
+            const node = new THREE.Mesh(nodeGeo, nodeMat);
+            node.position.copy(curve.getPoint(i / 4));
+            nodes.push(node);
+            vizScene.add(node);
+        }
+
+        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+        pointLight.position.set(0, 0, 5);
+        vizScene.add(pointLight);
+        vizScene.add(new THREE.AmbientLight(0xffffff, 0.2));
+
+        gsap.timeline({
             scrollTrigger: {
                 trigger: "#solution-section-container",
                 start: "top top",
@@ -380,19 +301,35 @@ document.addEventListener('DOMContentLoaded', function () {
                 scrub: 1,
                 onUpdate: (self) => {
                     const progress = self.progress;
-                    const stepProgress = Math.floor(progress * 5);
-                    const stepContents = document.querySelectorAll(".step-content");
-                    stepContents.forEach((step, i) => {
-                        step.classList.toggle('is-active', i === stepProgress);
-                    });
+                    const point = curve.getPointAt(progress);
+                    head.position.copy(point);
+                    tube.geometry.setDrawRange(0, Math.floor(progress * tube.geometry.attributes.position.count));
                 }
             }
         });
 
-        tl.from(nodes.map(n => n.scale), { x: 0, y: 0, z: 0, stagger: 0.02, duration: 0.2 })
-          .to(lines.map(l => l.material), { opacity: 0.5, stagger: 0.005, duration: 0.8 });
+        const stepContents = document.querySelectorAll(".step-content");
+        stepContents.forEach((step, i) => { 
+            ScrollTrigger.create({ 
+                trigger: step, 
+                start: "top center", 
+                end: "bottom center", 
+                toggleClass: "is-active",
+                onEnter: () => animateNode(i),
+                onEnterBack: () => animateNode(i),
+            }); 
+        });
 
         animateViz();
+    }
+
+    function animateNode(index) {
+        nodes.forEach((node, i) => {
+            const isActive = i === index;
+            gsap.to(node.material.color, { r: isActive ? 59/255 : 148/255, g: isActive ? 130/255 : 163/255, b: isActive ? 246/255 : 184/255, duration: 0.5 });
+            gsap.to(node.material, { emissiveIntensity: isActive ? 1 : 0, duration: 0.5 });
+            gsap.to(node.scale, { x: isActive ? 1.5 : 1, y: isActive ? 1.5 : 1, z: isActive ? 1.5 : 1, duration: 0.5, ease: "back.out(1.7)" });
+        });
     }
 
     function animateViz() {
