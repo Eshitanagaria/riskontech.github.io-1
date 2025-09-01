@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const applicant = applicantsData[applicantId];
             const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
             
-            // Determine Risk Category based on the final probability
             let riskCategory;
             if (latestRecord.Predicted_Prob_Default > 0.7) riskCategory = 'High';
             else if (latestRecord.Predicted_Prob_Default > 0.4) riskCategory = 'Medium';
@@ -67,12 +66,14 @@ document.addEventListener('DOMContentLoaded', function () {
         else { cibilScore = 300 + (1 - (prob - 0.70)/0.30) * 350; }
         cibilScore = Math.round(cibilScore);
 
+        // BUG FIX: The risk category was not being recalculated here, causing all scores to be red.
         let riskCategory;
         if (prob > 0.7) riskCategory = 'High';
         else if (prob > 0.4) riskCategory = 'Medium';
         else riskCategory = 'Low';
         
         const riskColorClass = riskCategory === 'Low' ? 'risk-low' : riskCategory === 'Medium' ? 'risk-medium' : 'risk-high';
+        
         const paymentHistoryHTML = applicant.history
             .map(h => {
                 const statusClass = h.Payment_Status.includes('late') ? 'risk-high' : h.Payment_Status.includes('early') ? 'risk-low' : '';
@@ -146,7 +147,6 @@ document.addEventListener('DOMContentLoaded', function () {
         reportContentWrapper.innerHTML = reportHTML;
         document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReportAsPDF(applicantId));
 
-        // --- GSAP ANIMATIONS FOR THE REPORT ---
         const tl = gsap.timeline();
         const scoreCounter = { value: 300 };
         
@@ -163,7 +163,6 @@ document.addEventListener('DOMContentLoaded', function () {
           .from(".graph-container img", { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, "-=0.8");
     }
 
-    // --- Handle Report Generation Click ---
     window.handleGenerateReport = function(applicantId) {
         const applicant = applicantsData[applicantId];
         const summaryContainer = document.getElementById('ai-summary-container');
@@ -191,29 +190,46 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 800);
     }
 
-    // --- Handle PDF Download (FIXED) ---
+    // BUG FIX: Rewritten PDF function for reliability
     function downloadReportAsPDF(applicantId) {
         const reportElement = document.getElementById('report-page-container');
+        const options = {
+            margin: 0,
+            filename: `RISKON_Report_${applicantId}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#111827' },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+
+        // Create a clone of the report to print
         const elementToPrint = reportElement.cloneNode(true);
+
+        // Ensure all animation-related transforms and opacities are reset on the clone
         elementToPrint.style.opacity = 1;
-        
+        elementToPrint.style.transform = 'none';
+        elementToPrint.querySelectorAll('*').forEach(el => {
+            el.style.opacity = 1;
+            el.style.transform = 'none';
+        });
+
+        // Hide buttons in the clone before printing
         const btn1 = elementToPrint.querySelector('#generate-report-btn');
         const btn2 = elementToPrint.querySelector('#download-pdf-btn');
-        if(btn1) btn1.style.display = 'none';
-        if(btn2) btn2.style.display = 'none';
-        
+        if (btn1) btn1.style.display = 'none';
+        if (btn2) btn2.style.display = 'none';
+
+        // Temporarily append clone to the body for rendering, but keep it off-screen
         elementToPrint.style.position = 'absolute';
         elementToPrint.style.left = '-9999px';
         document.body.appendChild(elementToPrint);
 
-        const options = { margin: 0, filename: `RISKON_Report_${applicantId}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
-
+        // Generate the PDF from the clean, static clone
         html2pdf().from(elementToPrint).set(options).save().then(() => {
-            document.body.removeChild(elementToPrint);
+            document.body.removeChild(elementToPrint); // Clean up by removing the clone
         });
     }
 
-    // --- Landing Page Animations ---
+ // --- Landing Page Animations ---
     let heroScene, heroCamera, heroRenderer, heroParticles;
     function initHeroAnimation() {
         const container = document.getElementById('hero-animation');
@@ -279,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const stepsContainer = document.getElementById('solution-steps');
     solutionStepsData.forEach((step, i) => { stepsContainer.innerHTML += `<div class="step-content" id="step-${i}"><h3 class="text-3xl font-bold mb-3">${step.title}</h3><p class="text-slate-400 text-lg">${step.description}</p></div>`; });
     
-    let vizScene, vizCamera, vizRenderer, particles, lines, nodes, dashboard;
+    let vizScene, vizCamera, vizRenderer, particles, lines, dashboard;
     
     function initSolutionViz() {
         const container = document.getElementById('solution-viz');
@@ -291,17 +307,18 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(vizRenderer.domElement);
         vizCamera.position.set(0, 0, 15);
 
-        // Particles
         const particleGeo = new THREE.BufferGeometry();
         const particleCount = 2000;
         const posArray = new Float32Array(particleCount * 3);
+        const colorArray = new Float32Array(particleCount * 3);
+
         for(let i=0; i < particleCount * 3; i++) { posArray[i] = (Math.random() - 0.5) * 20; }
         particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const particleMat = new THREE.PointsMaterial({ size: 0.05, color: 0x94a3b8 });
+        particleGeo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
+        const particleMat = new THREE.PointsMaterial({ size: 0.05, vertexColors: true });
         particles = new THREE.Points(particleGeo, particleMat);
         vizScene.add(particles);
 
-        // Lines (for tubes)
         const lineGeo = new THREE.BufferGeometry();
         const linePos = new Float32Array(200 * 3);
         lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
@@ -309,11 +326,6 @@ document.addEventListener('DOMContentLoaded', function () {
         lines = new THREE.Line(lineGeo, lineMat);
         vizScene.add(lines);
         
-        // Nodes (for clusters)
-        nodes = new THREE.Group();
-        vizScene.add(nodes);
-
-        // Dashboard
         const dashGeo = new THREE.PlaneGeometry(8, 5);
         const dashMat = new THREE.MeshBasicMaterial({ color: 0x1f2937, transparent: true, opacity: 0, side: THREE.DoubleSide });
         dashboard = new THREE.Mesh(dashGeo, dashMat);
@@ -336,33 +348,29 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Stage 1: Ingestion
         tl.to(particles.position, { x: 0, y: 0, z: -5, duration: 0.25 });
         tl.to(particles.scale, { x: 0.2, y: 0.2, z: 0.2, duration: 0.25 }, "<");
-        
-        // Stage 2: Processing
         tl.to(lines.material, { opacity: 1, duration: 0.05 });
         tl.to(particles.scale, { x: 0, y: 0, z: 0, duration: 0.05 }, "<");
-        
-        // Stage 3: Intelligence
         tl.to(lines.material, { opacity: 0, duration: 0.05 });
         tl.call(() => {
             const positions = particles.geometry.attributes.position.array;
+            const colors = particles.geometry.attributes.color.array;
             for(let i=0; i<particleCount; i++) {
                 const cluster = Math.floor(Math.random() * 3);
                 positions[i*3] = (cluster-1)*4 + (Math.random()-0.5)*2;
                 positions[i*3+1] = (Math.random()-0.5)*2;
                 positions[i*3+2] = (Math.random()-0.5)*2;
+                const cohortColor = new THREE.Color(cluster === 0 ? 0x22c55e : cluster === 1 ? 0xf59e0b : 0xef4444);
+                cohortColor.toArray(colors, i*3);
             }
             particles.geometry.attributes.position.needsUpdate = true;
+            particles.geometry.attributes.color.needsUpdate = true;
         });
         tl.to(particles.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
-        
-        // Stage 4: Prediction
         tl.to(particles.scale, { x: 0, y: 0, z: 0, duration: 0.2 });
         tl.to(dashboard.scale, { x: 1, y: 1, z: 1, duration: 0.2 }, "<");
         tl.to(dashboard.material, { opacity: 0.8, duration: 0.2 }, "<");
-
         animateViz();
     }
 
@@ -384,6 +392,5 @@ document.addEventListener('DOMContentLoaded', function () {
             vizRenderer.render(vizScene, vizCamera);
         }
     }
-    
     initSolutionViz();
 });
