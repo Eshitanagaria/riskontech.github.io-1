@@ -345,7 +345,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const svgConnectors = document.querySelectorAll('.svg-connector');
 
         svgNodes.forEach((node, i) => {
-            node.classList.toggle('is-active', i === index);
+            node.classList.toggle('is-active', i <= index);
         });
 
         svgConnectors.forEach((connector, i) => {
