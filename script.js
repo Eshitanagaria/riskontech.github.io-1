@@ -29,8 +29,14 @@ document.addEventListener('DOMContentLoaded', function () {
         Object.keys(applicantsData).forEach(applicantId => {
             const applicant = applicantsData[applicantId];
             const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
+            
+            // Determine Risk Category based on the final probability
+            let riskCategory;
+            if (latestRecord.Predicted_Prob_Default > 0.7) riskCategory = 'High';
+            else if (latestRecord.Predicted_Prob_Default > 0.4) riskCategory = 'Medium';
+            else riskCategory = 'Low';
+
             const riskPercentage = (latestRecord.Predicted_Prob_Default * 100).toFixed(2);
-            const riskCategory = latestRecord.Risk_Category;
             const riskColorClass = riskCategory === 'Low' ? 'text-green-400' : riskCategory === 'Medium' ? 'text-yellow-400' : 'text-red-400';
             
             const item = document.createElement('div');
@@ -52,14 +58,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Create RISKON Themed "Dossier" Report ---
     function createDossierReport(applicantId) {
         const applicant = applicantsData[applicantId];
-
-        // BUG FIX: Check for applicant data and history existence at the very start.
-        if (!applicant || !applicant.history || applicant.history.length === 0) {
-            reportContentWrapper.innerHTML = `<div class="report-container"><p class="text-red-400 text-center text-lg p-10">Error: Critical data missing for applicant ${applicantId}. Cannot generate report.</p></div>`;
-            gsap.from(reportContentWrapper, {opacity: 0, y: 20, duration: 0.5});
-            return;
-        }
-
         const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
         
         const prob = latestRecord.Predicted_Prob_Default;
@@ -68,8 +66,13 @@ document.addEventListener('DOMContentLoaded', function () {
         else if (prob <= 0.70) { cibilScore = 650 + (1 - (prob - 0.15)/0.55) * 130; } 
         else { cibilScore = 300 + (1 - (prob - 0.70)/0.30) * 350; }
         cibilScore = Math.round(cibilScore);
+
+        let riskCategory;
+        if (prob > 0.7) riskCategory = 'High';
+        else if (prob > 0.4) riskCategory = 'Medium';
+        else riskCategory = 'Low';
         
-        const riskColorClass = latestRecord.Risk_Category === 'Low' ? 'risk-low' : latestRecord.Risk_Category === 'Medium' ? 'risk-medium' : 'risk-high';
+        const riskColorClass = riskCategory === 'Low' ? 'risk-low' : riskCategory === 'Medium' ? 'risk-medium' : 'risk-high';
         const paymentHistoryHTML = applicant.history
             .map(h => {
                 const statusClass = h.Payment_Status.includes('late') ? 'risk-high' : h.Payment_Status.includes('early') ? 'risk-low' : '';
@@ -128,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     </button>
                     <div id="ai-summary-container" class="hidden mt-6">
                         <div class="report-section">
-                            <h3 class="report-section-title">GEMINI POWERED SUMMARY </h3>
+                            <h3 class="report-section-title">AI-POWERED SUMMARY (GEMINI-STYLE)</h3>
                             <div class="report-section-content">
                                 <p id="ai-summary-text" class="text-base leading-relaxed text-gray-300"></p>
                             </div>
