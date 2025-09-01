@@ -28,10 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
         applicantListContainer.innerHTML = '';
         Object.keys(applicantsData).forEach(applicantId => {
             const applicant = applicantsData[applicantId];
-            const latestRecord = (applicant.history && applicant.history.length > 0)
-                ? applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest)
-                : { Predicted_Prob_Default: 0, Risk_Category: 'N/A' };
-
+            const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
             const riskPercentage = (latestRecord.Predicted_Prob_Default * 100).toFixed(2);
             const riskCategory = latestRecord.Risk_Category;
             const riskColorClass = riskCategory === 'Low' ? 'text-green-400' : riskCategory === 'Medium' ? 'text-yellow-400' : 'text-red-400';
@@ -233,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-   // --- Landing Page Animations ---
+      // --- Landing Page Animations ---
     let heroScene, heroCamera, heroRenderer, heroParticles;
     function initHeroAnimation() {
         const container = document.getElementById('hero-animation');
@@ -303,13 +300,18 @@ document.addEventListener('DOMContentLoaded', function () {
     function initSolutionViz() {
         const viz = document.getElementById('solution-viz');
         viz.innerHTML = `
-            <div id="refinery-s1-funnel" class="refinery-element funnel">RISKON Data Pipeline</div>
-            <div id="refinery-s1-file1" class="refinery-element file-icon">application_train.csv</div>
-            <div id="refinery-s1-file2" class="refinery-element file-icon">bureau.csv</div>
-            <div id="refinery-s1-file3" class="refinery-element file-icon">previous_application.csv</div>
-            <div id="refinery-s1-file4" class="refinery-element file-icon">installments_payments.csv</div>
-            
-            `;
+            <div id="s1-funnel" class="refinery-element funnel" style="top: 35%; left: 50%; transform: translateX(-50%);">
+                <div class="refinery-label">RISKON Data Pipeline</div>
+            </div>
+            <div id="s1-file1" class="refinery-element file-icon">application_train.csv</div>
+            <div id="s1-file2" class="refinery-element file-icon">bureau.csv</div>
+            <div id="s1-file3" class="refinery-element file-icon">previous_application.csv</div>
+            <div id="s1-file4" class="refinery-element file-icon">installments_payments.csv</div>
+            <div id="s1-belt" class="refinery-element conveyor-belt" style="top: 60%; left: 50%; transform: translateX(-50%); opacity: 0;"></div>
+            <div id="s1-grid" class="refinery-element data-grid" style="top: 62%; left: 50%; transform: translateX(-50%); opacity: 0; scale: 0.5;">
+                ${Array.from({length: 30}).map(() => `<div class="data-grid-cell"></div>`).join('')}
+            </div>
+        `;
 
         const tl = gsap.timeline({
             scrollTrigger: {
@@ -318,22 +320,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 end: "bottom bottom",
                 scrub: 1,
                 onUpdate: (self) => {
-                    const progress = self.progress;
-                    const stepProgress = Math.floor(progress * solutionStepsData.length);
-                    const stepContents = document.querySelectorAll(".step-content");
-                    stepContents.forEach((step, i) => {
+                    const stepProgress = Math.floor(self.progress * solutionStepsData.length);
+                    document.querySelectorAll(".step-content").forEach((step, i) => {
                         step.classList.toggle('is-active', i === stepProgress);
                     });
                 }
             }
         });
-        
-        // Stage 1: Animate files into funnel
-        tl.from(["#refinery-s1-file1", "#refinery-s1-file2", "#refinery-s1-file3", "#refinery-s1-file4"], {
-            opacity: 0, y: (i) => (i % 2 === 0 ? -100 : 100), x: (i) => (i < 2 ? -100 : 100), stagger: 0.05
-        }).to(["#refinery-s1-file1", "#refinery-s1-file2", "#refinery-s1-file3", "#refinery-s1-file4"], {
+
+        // Stage 1 Animation
+        tl.from(["#s1-file1", "#s1-file2", "#s1-file3", "#s1-file4"], {
+            opacity: 0, y: (i) => (i % 2 === 0 ? -150 : 150), x: (i) => (i < 2 ? -150 : 150), stagger: 0.1, duration: 0.2
+        }).to(["#s1-file1", "#s1-file2", "#s1-file3", "#s1-file4"], {
             y: 0, x: 0, scale: 0.1, opacity: 0, duration: 0.2
-        }).to("#refinery-s1-funnel", { opacity: 0, scale: 0.5, duration: 0.1 });
+        }).to("#s1-funnel", { opacity: 0, scale: 0.5, y: -50, duration: 0.1 })
+          .to(["#s1-belt", "#s1-grid"], { opacity: 1, y: 0, scale: 1, duration: 0.2 });
+
+        // Placeholder for future stages
+        tl.to({}, {duration: 0.8}); // Add duration for the other 4 stages
     }
     
     initSolutionViz();
