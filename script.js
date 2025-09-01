@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
     gsap.registerPlugin(ScrollTrigger);
-    let currentChart = null; // To hold the chart instance
 
     // --- Page Elements ---
     const landingPage = document.getElementById('landing-page');
@@ -45,22 +44,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     <p class="text-slate-400 text-sm">Risk (${riskCategory})</p>
                     <p class="font-semibold text-lg ${riskColorClass}">${riskPercentage}%</p>
                 </div>`;
-            item.addEventListener('click', () => { createDossierReport(applicantId); showPage(reportPage); });
+            item.addEventListener('click', () => { createCibilReport(applicantId); showPage(reportPage); });
             applicantListContainer.appendChild(item);
         });
     }
     
-    // --- Create RISKON "Dossier" Report ---
-    function createDossierReport(applicantId) {
-        if (currentChart) {
-            currentChart.destroy();
-        }
+    // --- Create CIBIL-Style Report ---
+    function createCibilReport(applicantId) {
         const applicant = applicantsData[applicantId];
 
-        // BUG FIX: Check for applicant data and history existence at the very start.
         if (!applicant || !applicant.history || applicant.history.length === 0) {
-            reportContentWrapper.innerHTML = `<div class="report-container"><p class="text-red-400 text-center text-lg p-10">Error: Critical data missing for applicant ${applicantId}. Cannot generate report.</p></div>`;
-            gsap.from(reportContentWrapper, {opacity: 0, y: 20, duration: 0.5});
+            reportContentWrapper.innerHTML = `<div id="report-page-container"><p class="text-red-500 text-center text-lg p-10">Error: Critical data missing for applicant ${applicantId}. Cannot generate report.</p></div>`;
+            gsap.from("#report-page-container", {opacity: 0, y: 20, duration: 0.5});
             return;
         }
 
@@ -74,6 +69,7 @@ document.addEventListener('DOMContentLoaded', function () {
         cibilScore = Math.round(cibilScore);
         
         const riskColorClass = latestRecord.Risk_Category === 'Low' ? 'risk-low' : latestRecord.Risk_Category === 'Medium' ? 'risk-medium' : 'risk-high';
+        
         const paymentHistoryHTML = applicant.history
             .map(h => {
                 const statusClass = h.Payment_Status.includes('late') ? 'risk-high' : h.Payment_Status.includes('early') ? 'risk-low' : '';
@@ -82,194 +78,136 @@ document.addEventListener('DOMContentLoaded', function () {
             .join('');
 
         const reportHTML = `
-            <div id="report-page-container" class="report-container" style="opacity: 0;">
-                <div class="report-header">
-                    <div>
-                        <h1>RISKON&trade; Digital Dossier</h1>
-                        <p class="text-gray-400">Applicant ID: ${applicantId} | Name: ${applicant.personal.name}</p>
-                    </div>
+            <div id="report-page-container" style="opacity: 0;">
+                <div class="header">
+                    <h1>RISKON&trade; <span style="color: #555; font-weight: 300;">CIBIL Co-Branded Report</span></h1>
                     <div class="report-info">
-                        <strong>Generated:</strong> ${new Date().toLocaleDateString('en-GB')}<br>
-                        <strong>Control:</strong> RKN${applicantId}
+                        <strong>Applicant ID:</strong> ${applicantId}<br>
+                        <strong>Report Date:</strong> ${new Date().toLocaleDateString('en-GB')}
                     </div>
                 </div>
-
-                <div class="tab-nav">
-                    <button class="tab-button active" data-tab="dashboard">Risk Dashboard</button>
-                    <button class="tab-button" data-tab="ledger">Payment Ledger</button>
-                    <button class="tab-button" data-tab="insights">AI Insights</button>
-                </div>
-
-                <div id="tab-dashboard" class="tab-content active">
-                    <div class="report-section mt-6">
-                        <div class="grid-3-col">
-                             <div class="kpi-card">
-                                <p class="label">RISKON Category</p>
-                                <p class="value ${riskColorClass}">${latestRecord.Risk_Category}</p>
+                <div class="section grid-container">
+                    <div class="info-box">
+                        <h3 class="font-bold">RISKON Score</h3>
+                        <div class="score-gauge-container">
+                            <svg class="score-gauge-svg" viewBox="0 0 200 100">
+                                <circle class="score-gauge-track" pathLength="100"></circle>
+                                <circle id="score-gauge-bar" class="score-gauge-bar ${riskColorClass}" pathLength="100"></circle>
+                            </svg>
+                            <div class="score-gauge-text">
+                                <div id="cibil-score-span" class="score-value ${riskColorClass}">300</div>
+                                <div class="score-label">CIBIL Equivalent</div>
                             </div>
-                             <div class="kpi-card">
-                                <p class="label">Default Probability</p>
-                                <p class="value">${(prob * 100).toFixed(2)}%</p>
-                            </div>
-                             <div class="kpi-card">
-                                <p class="label">CIBIL Equivalent</p>
-                                <p class="value">${cibilScore}</p>
-                            </div>
-                        </div>
-                         <div id="interactive-graph-container">
-                            <canvas id="interactive-graph-canvas"></canvas>
                         </div>
                     </div>
-                </div>
-
-                <div id="tab-ledger" class="tab-content">
-                    <div class="report-section mt-6">
-                        <h3 class="report-section-title">Detailed Payment History</h3>
-                        <div class="report-section-content payment-ledger-grid">
-                            ${paymentHistoryHTML || '<p>No historical payments found.</p>'}
-                        </div>
+                    <div class="info-box">
+                        <h3 class="font-bold">Personal & Risk Details</h3>
+                        <div class="info-pair"><span class="label">Name:</span> <span class="value">${applicant.personal.name}</span></div>
+                        <div class="info-pair"><span class="label">Date of Birth:</span> <span class="value">${applicant.personal.dob}</span></div>
+                        <div class="info-pair"><span class="label">Gender:</span> <span class="value">${applicant.personal.gender}</span></div>
+                        <div class="info-pair"><span class="label">RISKON Category:</span> <span class="value font-bold ${riskColorClass}">${latestRecord.Risk_Category}</span></div>
+                        <div class="info-pair"><span class="label">Default Probability:</span> <span class="value">${(prob * 100).toFixed(2)}%</span></div>
                     </div>
                 </div>
-                
-                <div id="tab-insights" class="tab-content">
-                     <div class="report-section mt-6">
-                        <h3 class="report-section-title">AI-POWERED SUMMARY</h3>
-                        <div class="report-section-content">
+                 <div class="section">
+                    <div class="section-title">RISKON DYNAMIC RISK TRACKING</div>
+                     <div class="graph-container">
+                        <img src="${applicant.graphImage}" alt="Risk Trend Graph for Applicant ${applicantId}">
+                    </div>
+                </div>
+                <div class="section">
+                    <div class="section-title">CREDIT ACCOUNT & PAYMENT HISTORY</div>
+                    <div class="payment-history-grid">
+                        ${paymentHistoryHTML || '<p>No historical payments found.</p>'}
+                    </div>
+                </div>
+                <div class="report-generation-section text-center">
+                     <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 flex items-center mx-auto">
+                        <svg class="w-6 h-6 mr-2" viewBox="0 0 24 24"><path fill="currentColor" d="M12,1.75A10.25,10.25,0,0,0,1.75,12A10.25,10.25,0,0,0,12,22.25A10.25,10.25,0,0,0,22.25,12A10.25,10.25,0,0,0,12,1.75ZM9.25,6a1.5,1.5,0,1,1-1.5,1.5A1.5,1.5,0,0,1,9.25,6Zm6,12a1.5,1.5,0,1,1,1.5-1.5A1.5,1.5,0,0,1,15.25,18Zm-2-6a1.5,1.5,0,1,1-1.5,1.5A1.5,1.5,0,0,1,13.25,12Z"/></svg>
+                        Generate AI Summary
+                    </button>
+                    <div id="ai-summary-container" class="hidden mt-6 text-left">
+                        <div class="info-box">
+                            <h3 class="font-bold">AI-POWERED SUMMARY (GEMINI-STYLE)</h3>
                             <div id="ai-summary-content">
-                                <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
-                                    Generate Insights
-                                </button>
-                            </div>
-                            <div id="pdf-download-area" class="hidden mt-4">
-                               <button id="download-pdf-btn" onclick="downloadReportAsPDF('${applicantId}')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
-                                    Download Full Report as PDF
-                                </button>
+                                <p id="ai-summary-text" class="text-base leading-relaxed"></p>
                             </div>
                         </div>
+                        <button id="download-pdf-btn" class="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
+                            Download as PDF
+                        </button>
                     </div>
                 </div>
             </div>`;
         
         reportContentWrapper.innerHTML = reportHTML;
+        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReportAsPDF(applicantId));
+
+        const tl = gsap.timeline();
+        const scoreCounter = { value: 300 };
+        const gaugeBar = document.getElementById('score-gauge-bar');
+        const scorePercentage = (cibilScore - 300) / 600;
+        const dashOffset = 100 * (1 - scorePercentage);
         
-        setupTabs();
-        animateInteractiveGraph(applicantId);
-        gsap.from("#report-page-container", { opacity: 0, duration: 0.5 });
-        gsap.from(".kpi-card", { opacity: 0, y: 30, stagger: 0.15, duration: 0.5, delay: 0.2 });
-    }
-
-    function setupTabs() {
-        const tabButtons = document.querySelectorAll('.tab-button');
-        const tabContents = document.querySelectorAll('.tab-content');
-        tabButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                tabButtons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                const tabId = button.getAttribute('data-tab');
-                tabContents.forEach(content => {
-                    content.classList.toggle('active', content.id === `tab-${tabId}`);
-                });
-            });
-        });
-    }
-
-    function animateInteractiveGraph(applicantId) {
-        const canvas = document.getElementById('interactive-graph-canvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const applicant = applicantsData[applicantId];
-        const history = applicant.history.filter(h => h.Data_Type !== 'Forecast').sort((a,b) => a.Month_Offset - b.Month_Offset);
-
-        if (history.length < 1) return;
-
-        const labels = history.map(p => `Month ${p.Month_Offset}`);
-        const data = history.map(p => p.Predicted_Prob_Default * 100);
-
-        const riskColor = history[history.length-1].Risk_Category === 'Low' ? '#22c55e' : history[history.length-1].Risk_Category === 'Medium' ? '#f59e0b' : '#ef4444';
-
-        currentChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Default Probability (%)',
-                    data: data,
-                    borderColor: riskColor,
-                    backgroundColor: 'transparent',
-                    tension: 0.4,
-                    pointBackgroundColor: riskColor,
-                    pointHoverRadius: 8,
-                    pointHoverBackgroundColor: '#ffffff',
-                    pointHoverBorderColor: riskColor,
-                    pointHoverBorderWidth: 2,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: {
-                    duration: 2000,
-                    easing: 'easeInOutQuart'
-                },
-                scales: {
-                    y: { beginAtZero: true, max: 100, ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
-                    x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        enabled: true,
-                        backgroundColor: '#1f2937',
-                        titleColor: '#ffffff',
-                        bodyColor: '#e5e7eb',
-                        borderColor: '#3b82f6',
-                        borderWidth: 1,
-                        padding: 10,
-                        callbacks: {
-                            label: function(context) { return `Risk: ${context.parsed.y.toFixed(2)}%`; }
-                        }
-                    }
-                }
-            }
-        });
+        gaugeBar.style.strokeDasharray = 100;
+        gaugeBar.style.strokeDashoffset = 100;
+        
+        tl.to("#report-page-container", { opacity: 1, duration: 0.5 })
+          .to(scoreCounter, { 
+              value: cibilScore, 
+              duration: 1.5, 
+              ease: "power2.out",
+              onUpdate: () => {
+                  document.getElementById("cibil-score-span").textContent = Math.round(scoreCounter.value);
+              }
+          }, "-=0.2")
+          .to(gaugeBar, { 
+              strokeDashoffset: dashOffset, 
+              duration: 1.5, 
+              ease: "power2.out" 
+          }, "<")
+          .from(".section", { opacity: 0, y: 30, stagger: 0.2, duration: 0.6 }, "-=1.2")
+          .from(".graph-container img", { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, "-=0.8");
     }
 
     window.handleGenerateReport = function(applicantId) {
         const applicant = applicantsData[applicantId];
-        const summaryContent = document.getElementById('ai-summary-content');
+        const summaryContainer = document.getElementById('ai-summary-container');
+        const summaryContent = document.getElementById('ai-summary-text');
         const generateBtn = document.getElementById('generate-report-btn');
-        const pdfArea = document.getElementById('pdf-download-area');
+
+        summaryContent.textContent = "";
+        summaryContainer.classList.remove('hidden');
+        gsap.set(summaryContainer, { height: 'auto', opacity: 1 });
+        gsap.from(summaryContainer, { height: 0, opacity: 0, duration: 0.6, ease: 'power2.out' });
         
         generateBtn.style.display = 'none';
-        summaryContent.innerHTML = `<p id="ai-summary-text"></p>`;
-        const p = summaryContent.querySelector('p');
-            
-        let i = 0;
-        const summary = applicant.geminiSummary;
-        function typeWriter() {
-            if (i < summary.length) {
-                p.innerHTML += summary.charAt(i);
-                i++;
-                setTimeout(typeWriter, 15);
-            } else {
-                pdfArea.classList.remove('hidden');
-                gsap.from(pdfArea, { opacity: 0, y: 10, duration: 0.5 });
+
+        setTimeout(() => {
+            const summary = applicant.geminiSummary;
+            let i = 0;
+            function typeWriter() {
+                if (i < summary.length) {
+                    summaryContent.innerHTML += summary.charAt(i);
+                    i++;
+                    setTimeout(typeWriter, 20);
+                }
             }
-        }
-        typeWriter();
+            typeWriter();
+        }, 800);
     }
-    
-    // PDF GENERATION FIX
-    window.downloadReportAsPDF = function(applicantId) {
+
+    // BUG FIX: Rewritten PDF function for reliability
+    function downloadReportAsPDF(applicantId) {
         const reportElement = document.getElementById('report-page-container');
         const options = {
             margin: 0,
             filename: `RISKON_Report_${applicantId}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#111827' },
+            html2canvas: { scale: 2, useCORS: true },
             jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
         };
-        
+
         const elementToPrint = reportElement.cloneNode(true);
         elementToPrint.style.opacity = 1;
         elementToPrint.style.transform = 'none';
@@ -278,16 +216,10 @@ document.addEventListener('DOMContentLoaded', function () {
             el.style.transform = 'none';
         });
 
-        const pdfBtn = elementToPrint.querySelector('#pdf-download-area');
-        if (pdfBtn) pdfBtn.style.display = 'none';
-        
-        // Handle the canvas chart for PDF
-        const canvas = elementToPrint.querySelector('#interactive-graph-canvas');
-        if(canvas && currentChart) {
-            const image = new Image();
-            image.src = currentChart.toBase64Image();
-            canvas.parentNode.replaceChild(image, canvas);
-        }
+        const btn1 = elementToPrint.querySelector('#generate-report-btn');
+        const btn2 = elementToPrint.querySelector('#download-pdf-btn');
+        if (btn1) btn1.style.display = 'none';
+        if (btn2) btn2.style.display = 'none';
 
         elementToPrint.style.position = 'absolute';
         elementToPrint.style.left = '-9999px';
@@ -297,8 +229,8 @@ document.addEventListener('DOMContentLoaded', function () {
             document.body.removeChild(elementToPrint);
         });
     }
-    
-     // --- Landing Page Animations ---
+
+       // --- Landing Page Animations ---
     let heroScene, heroCamera, heroRenderer, heroParticles;
     function initHeroAnimation() {
         const container = document.getElementById('hero-animation');
@@ -355,70 +287,58 @@ document.addEventListener('DOMContentLoaded', function () {
     initHeroAnimation();
 
     
-    // --- NEW "SIMPLE LINES WITH ARROWS" ANIMATION ---
+    // --- "DATA REFINERY" ANIMATION ---
     const solutionStepsData = [ 
-        { title: "Stage 1: Raw Material Intake", description: "Raw, disorganized data files are ingested into the RISKON Data Pipeline." },
-        { title: "Stage 2: The 'Glass Box' Chamber", description: "Features are selected (IV) and transformed (WoE) into a standardized format." },
-        { title: "Stage 3: The Cohort Sorting Hub", description: "The population is segmented into distinct financial archetypes using K-Means Clustering." },
-        { title: "Stage 4: Dynamic Calibration Lab", description: "Cohort-specific Ordinary Differential Equations (ODEs) are calibrated from historical data." },
-        { title: "Stage 5: Final Model Assembly", description: "A unique, regularized Master Risk Equation is trained for each cohort." }
+        { title: "Stage 1: Raw Material Intake", description: "We take in the chaos." }, 
+        { title: "Stage 2: The 'Glass Box' Chamber", description: "We process and structure information." }, 
+        { title: "Stage 3: The Cohort Sorting Hub", description: "We learn from the patterns." }, 
+        { title: "Stage 4: Dynamic Calibration Lab", description: "We calibrate cohort-specific dynamics." },
+        { title: "Stage 5: Final Model Assembly", description: "We predict risk, before it strikes." }
     ];
     const stepsContainer = document.getElementById('solution-steps');
-    stepsContainer.innerHTML = ''; // Clear previous content
     solutionStepsData.forEach((step, i) => { stepsContainer.innerHTML += `<div class="step-content" id="step-${i}"><h3 class="text-3xl font-bold mb-3">${step.title}</h3><p class="text-slate-400 text-lg">${step.description}</p></div>`; });
     
     function initSolutionViz() {
-        const stepContents = document.querySelectorAll(".step-content");
-        stepContents.forEach((step, i) => { 
-            ScrollTrigger.create({ 
-                trigger: step, 
-                start: "top center", 
-                end: "bottom center", 
-                onEnter: () => updateSolutionSVG(i),
-                onEnterBack: () => updateSolutionSVG(i),
-            }); 
-        });
+        const viz = document.getElementById('solution-viz');
+        viz.innerHTML = `
+            <div id="s1-funnel" class="refinery-element funnel" style="top: 35%; left: 50%; transform: translateX(-50%);">
+                <div class="refinery-label">RISKON Data Pipeline</div>
+            </div>
+            <div id="s1-file1" class="refinery-element file-icon">application_train.csv</div>
+            <div id="s1-file2" class="refinery-element file-icon">bureau.csv</div>
+            <div id="s1-file3" class="refinery-element file-icon">previous_application.csv</div>
+            <div id="s1-file4" class="refinery-element file-icon">installments_payments.csv</div>
+            <div id="s1-belt" class="refinery-element conveyor-belt" style="top: 60%; left: 50%; transform: translateX(-50%); opacity: 0;"></div>
+            <div id="s1-grid" class="refinery-element data-grid" style="top: 62%; left: 50%; transform: translateX(-50%); opacity: 0; scale: 0.5;">
+                ${Array.from({length: 30}).map(() => `<div class="data-grid-cell"></div>`).join('')}
+            </div>
+        `;
 
-        const svgConnectors = document.querySelectorAll('.svg-connector');
-        svgConnectors.forEach(connector => {
-            const pathLength = connector.getTotalLength();
-            connector.style.strokeDasharray = pathLength;
-            connector.style.strokeDashoffset = pathLength;
-        });
-
-        updateSolutionSVG(0); // Initialize first state
-    }
-
-    function updateSolutionSVG(index) {
-        const svgNodes = document.querySelectorAll('.svg-node');
-        const svgConnectors = document.querySelectorAll('.svg-connector');
-
-        svgNodes.forEach((node, i) => {
-            node.classList.toggle('is-active', i === index);
-        });
-
-        svgConnectors.forEach((connector, i) => {
-            const pathLength = connector.getTotalLength();
-            if (i < index) {
-                gsap.to(connector, { 
-                    strokeDashoffset: 0, 
-                    duration: 0.5,
-                    onStart: () => {
-                        connector.setAttribute('marker-end', 'url(#arrowhead-active)');
-                        connector.style.stroke = '#3b82f6';
-                    }
-                });
-            } else {
-                gsap.to(connector, { 
-                    strokeDashoffset: pathLength, 
-                    duration: 0.5,
-                    onComplete: () => {
-                        connector.setAttribute('marker-end', 'url(#arrowhead-inactive)');
-                        connector.style.stroke = '#475569';
-                    }
-                });
+        const tl = gsap.timeline({
+            scrollTrigger: {
+                trigger: "#solution-section-container",
+                start: "top top",
+                end: "bottom bottom",
+                scrub: 1,
+                onUpdate: (self) => {
+                    const stepProgress = Math.floor(self.progress * solutionStepsData.length);
+                    document.querySelectorAll(".step-content").forEach((step, i) => {
+                        step.classList.toggle('is-active', i === stepProgress);
+                    });
+                }
             }
         });
+
+        // Stage 1 Animation
+        tl.from(["#s1-file1", "#s1-file2", "#s1-file3", "#s1-file4"], {
+            opacity: 0, y: (i) => (i % 2 === 0 ? -150 : 150), x: (i) => (i < 2 ? -150 : 150), stagger: 0.1, duration: 0.2
+        }).to(["#s1-file1", "#s1-file2", "#s1-file3", "#s1-file4"], {
+            y: 0, x: 0, scale: 0.1, opacity: 0, duration: 0.2
+        }).to("#s1-funnel", { opacity: 0, scale: 0.5, y: -50, duration: 0.1 })
+          .to(["#s1-belt", "#s1-grid"], { opacity: 1, y: 0, scale: 1, duration: 0.2 });
+
+        // Placeholder for future stages
+        tl.to({}, {duration: 0.8}); // Add duration for the other 4 stages
     }
     
     initSolutionViz();
