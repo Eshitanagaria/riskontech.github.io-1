@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
     gsap.registerPlugin(ScrollTrigger);
-    let currentChart = null; // To hold the chart instance
 
     // --- Page Elements ---
     const landingPage = document.getElementById('landing-page');
@@ -30,8 +29,14 @@ document.addEventListener('DOMContentLoaded', function () {
         Object.keys(applicantsData).forEach(applicantId => {
             const applicant = applicantsData[applicantId];
             const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
+            
+            // Determine Risk Category based on the final probability
+            let riskCategory;
+            if (latestRecord.Predicted_Prob_Default > 0.7) riskCategory = 'High';
+            else if (latestRecord.Predicted_Prob_Default > 0.4) riskCategory = 'Medium';
+            else riskCategory = 'Low';
+
             const riskPercentage = (latestRecord.Predicted_Prob_Default * 100).toFixed(2);
-            const riskCategory = latestRecord.Risk_Category;
             const riskColorClass = riskCategory === 'Low' ? 'text-green-400' : riskCategory === 'Medium' ? 'text-yellow-400' : 'text-red-400';
             
             const item = document.createElement('div');
@@ -50,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
     
- // --- Create RISKON Themed "Dossier" Report ---
+    // --- Create RISKON Themed "Dossier" Report ---
     function createDossierReport(applicantId) {
         const applicant = applicantsData[applicantId];
         const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
@@ -184,6 +189,28 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             typeWriter();
         }, 800);
+    }
+
+    // --- Handle PDF Download (FIXED) ---
+    function downloadReportAsPDF(applicantId) {
+        const reportElement = document.getElementById('report-page-container');
+        const elementToPrint = reportElement.cloneNode(true);
+        elementToPrint.style.opacity = 1;
+        
+        const btn1 = elementToPrint.querySelector('#generate-report-btn');
+        const btn2 = elementToPrint.querySelector('#download-pdf-btn');
+        if(btn1) btn1.style.display = 'none';
+        if(btn2) btn2.style.display = 'none';
+        
+        elementToPrint.style.position = 'absolute';
+        elementToPrint.style.left = '-9999px';
+        document.body.appendChild(elementToPrint);
+
+        const options = { margin: 0, filename: `RISKON_Report_${applicantId}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+
+        html2pdf().from(elementToPrint).set(options).save().then(() => {
+            document.body.removeChild(elementToPrint);
+        });
     }
 
     
