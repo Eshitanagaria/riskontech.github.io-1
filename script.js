@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     </button>
                     <div id="ai-summary-container" class="hidden mt-6">
                         <div class="report-section">
-                            <h3 class="report-section-title">AI-POWERED SUMMARY (GEMINI-STYLE)</h3>
+                            <h3 class="report-section-title">QUICK SUMMARY </h3>
                             <div class="report-section-content">
                                 <p id="ai-summary-text" class="text-base leading-relaxed text-gray-300"></p>
                             </div>
