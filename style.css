@@ -28,13 +28,13 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
-    min-height: 500vh;
+    min-height: 300vh; /* Reduced height for faster scrolling */
 }
 #solution-steps {
     position: relative;
 }
 .step-content {
-    height: 100vh;
+    height: 60vh; /* Reduced height for faster scrolling */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -59,8 +59,36 @@ body {
     height: 80vh;
 }
 
+/* SVG STYLES for Solution Animation */
+.svg-node circle {
+    stroke-width: 2;
+    stroke: #475569;
+    fill: #1e293b;
+    transition: all 0.3s ease-in-out;
+}
+.svg-node text {
+    fill: #9ca3af;
+    font-size: 14px;
+    font-weight: 500;
+    text-anchor: middle;
+    transition: fill 0.3s ease-in-out;
+}
+.svg-connector {
+    stroke: #475569;
+    stroke-width: 2;
+    fill: none;
+    transition: stroke 0.3s ease-in-out;
+}
+.svg-node.is-active circle {
+    stroke: #3b82f6;
+    fill: #3b82f633;
+}
+.svg-node.is-active text {
+    fill: #e2e8f0;
+}
 
-/* --- NEW RISKON "DOSSIER" REPORT STYLES --- */
+
+/* --- RISKON "DOSSIER" REPORT STYLES --- */
 .report-container {
     color: #d1d5db;
 }
