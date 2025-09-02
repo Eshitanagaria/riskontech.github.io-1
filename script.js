@@ -136,15 +136,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <p id="ai-summary-text" class="text-base leading-relaxed text-gray-300"></p>
                             </div>
                         </div>
-                        <button id="download-pdf-btn" class="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
-                            Download as PDF
-                        </button>
+                        
                     </div>
                 </div>
             </div>`;
         
-        reportContentWrapper.innerHTML = reportHTML;
-        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReportAsPDF(applicantId));
 
         // --- GSAP ANIMATIONS FOR THE REPORT ---
         const tl = gsap.timeline();
