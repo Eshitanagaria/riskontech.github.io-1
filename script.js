@@ -31,7 +31,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const applicant = applicantsData[applicantId];
             const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
             const riskPercentage = (latestRecord.Predicted_Prob_Default * 100).toFixed(2);
-            const riskCategory = latestRecord.Risk_Category;
+            
+            let riskCategory;
+            if (latestRecord.Predicted_Prob_Default > 0.7) riskCategory = 'High';
+            else if (latestRecord.Predicted_Prob_Default > 0.4) riskCategory = 'Medium';
+            else riskCategory = 'Low';
+
             const riskColorClass = riskCategory === 'Low' ? 'text-green-400' : riskCategory === 'Medium' ? 'text-yellow-400' : 'text-red-400';
             
             const item = document.createElement('div');
@@ -73,7 +78,13 @@ document.addEventListener('DOMContentLoaded', function () {
         else { cibilScore = 300 + (1 - (prob - 0.70)/0.30) * 350; }
         cibilScore = Math.round(cibilScore);
         
-        const riskColorClass = latestRecord.Risk_Category === 'Low' ? 'risk-low' : latestRecord.Risk_Category === 'Medium' ? 'risk-medium' : 'risk-high';
+        let riskCategory;
+        if (prob > 0.7) riskCategory = 'High';
+        else if (prob > 0.4) riskCategory = 'Medium';
+        else riskCategory = 'Low';
+        
+        const riskColorClass = riskCategory === 'Low' ? 'risk-low' : riskCategory === 'Medium' ? 'risk-medium' : 'risk-high';
+        
         const paymentHistoryHTML = applicant.history
             .map(h => {
                 const statusClass = h.Payment_Status.includes('late') ? 'risk-high' : h.Payment_Status.includes('early') ? 'risk-low' : '';
@@ -105,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div class="grid-3-col">
                              <div class="kpi-card">
                                 <p class="label">RISKON Category</p>
-                                <p class="value ${riskColorClass}">${latestRecord.Risk_Category}</p>
+                                <p class="value ${riskColorClass}">${riskCategory}</p>
                             </div>
                              <div class="kpi-card">
                                 <p class="label">Default Probability</p>
@@ -180,7 +191,12 @@ document.addEventListener('DOMContentLoaded', function () {
         const labels = history.map(p => `Month ${p.Month_Offset}`);
         const data = history.map(p => p.Predicted_Prob_Default * 100);
 
-        const riskColor = applicant.history[applicant.history.length-1].Risk_Category === 'Low' ? '#22c55e' : applicant.history[applicant.history.length-1].Risk_Category === 'Medium' ? '#f59e0b' : '#ef4444';
+        let riskCategory = 'Low';
+        const finalRisk = data[data.length - 1];
+        if (finalRisk > 70) riskCategory = 'High';
+        else if (finalRisk > 40) riskCategory = 'Medium';
+        
+        const riskColor = riskCategory === 'Low' ? '#22c55e' : riskCategory === 'Medium' ? '#f59e0b' : '#ef4444';
 
         currentChart = new Chart(ctx, {
             type: 'line',
