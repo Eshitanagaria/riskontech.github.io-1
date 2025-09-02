@@ -92,12 +92,14 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .join('');
 
+        const applicantName = applicant?.personal?.name || "N/A"; // SAFE ACCESS
+
         const reportHTML = `
             <div id="report-page-container" class="report-container" style="opacity: 0;">
                 <div class="report-header">
                     <div>
                         <h1>RISKON&trade; Digital Dossier</h1>
-                        <p class="text-gray-400">Applicant ID: ${applicantId} | Name: ${applicant.personal.name}</p>
+                        <p class="text-gray-400">Applicant ID: ${applicantId} | Name: ${applicantName}</p>
                     </div>
                     <div class="report-info">
                         <strong>Generated:</strong> ${new Date().toLocaleDateString('en-GB')}<br>
