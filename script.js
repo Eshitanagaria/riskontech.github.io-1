@@ -1,74 +1,6 @@
-document.addEventListener('DOMContentLoaded', function () {
-    gsap.registerPlugin(ScrollTrigger);
-    let currentChart = null; // To hold the chart instance
-
-    // --- Page Elements ---
-    const landingPage = document.getElementById('landing-page');
-    const monitoringPage = document.getElementById('monitoring-page');
-    const reportPage = document.getElementById('report-page');
-    const demoBtn = document.getElementById('demo-btn');
-    const backToLandingBtn = document.getElementById('back-to-landing-btn');
-    const backToMonitoringBtn = document.getElementById('back-to-monitoring-btn');
-    const applicantListContainer = document.getElementById('applicant-list');
-    const reportContentWrapper = document.getElementById('report-content-wrapper');
-
-    // --- Navigation ---
-    function showPage(page) {
-        landingPage.classList.add('hidden');
-        monitoringPage.classList.add('hidden');
-        reportPage.classList.add('hidden');
-        page.classList.remove('hidden');
-        window.scrollTo(0, 0);
-    }
-    demoBtn.addEventListener('click', () => { populateApplicantList(); showPage(monitoringPage); });
-    backToLandingBtn.addEventListener('click', () => showPage(landingPage));
-    backToMonitoringBtn.addEventListener('click', () => showPage(monitoringPage));
-
-    // --- Populate Applicant List ---
-    function populateApplicantList() {
-        applicantListContainer.innerHTML = '';
-        Object.keys(applicantsData).forEach(applicantId => {
-            const applicant = applicantsData[applicantId];
-            const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
-            const riskPercentage = (latestRecord.Predicted_Prob_Default * 100).toFixed(2);
-            
-            let riskCategory;
-            if (latestRecord.Predicted_Prob_Default > 0.7) riskCategory = 'High';
-            else if (latestRecord.Predicted_Prob_Default > 0.4) riskCategory = 'Medium';
-            else riskCategory = 'Low';
-
-            const riskColorClass = riskCategory === 'Low' ? 'text-green-400' : riskCategory === 'Medium' ? 'text-yellow-400' : 'text-red-400';
-            
-            const item = document.createElement('div');
-            item.className = 'glass-card monitoring-card p-4 rounded-lg flex justify-between items-center cursor-pointer transition duration-300';
-            item.innerHTML = `
-                <div>
-                    <p class="text-slate-400 text-sm">Applicant ID</p>
-                    <p class="text-white font-semibold text-lg">${parseInt(applicantId)}</p>
-                </div>
-                <div class="text-right">
-                    <p class="text-slate-400 text-sm">Risk (${riskCategory})</p>
-                    <p class="font-semibold text-lg ${riskColorClass}">${riskPercentage}%</p>
-                </div>`;
-            item.addEventListener('click', () => { createDossierReport(applicantId); showPage(reportPage); });
-            applicantListContainer.appendChild(item);
-        });
-    }
-    
-    // --- Create RISKON "Dossier" Report ---
+    // --- Create RISKON Themed "Dossier" Report ---
     function createDossierReport(applicantId) {
-        if (currentChart) {
-            currentChart.destroy();
-        }
         const applicant = applicantsData[applicantId];
-
-        // BUG FIX: Check for applicant data and history existence at the very start.
-        if (!applicant || !applicant.history || applicant.history.length === 0) {
-            reportContentWrapper.innerHTML = `<div class="report-container"><p class="text-red-400 text-center text-lg p-10">Error: Critical data missing for applicant ${applicantId}. Cannot generate report.</p></div>`;
-            gsap.from(reportContentWrapper, {opacity: 0, y: 20, duration: 0.5});
-            return;
-        }
-
         const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
         
         const prob = latestRecord.Predicted_Prob_Default;
@@ -77,14 +9,13 @@ document.addEventListener('DOMContentLoaded', function () {
         else if (prob <= 0.70) { cibilScore = 650 + (1 - (prob - 0.15)/0.55) * 130; } 
         else { cibilScore = 300 + (1 - (prob - 0.70)/0.30) * 350; }
         cibilScore = Math.round(cibilScore);
-        
+
         let riskCategory;
         if (prob > 0.7) riskCategory = 'High';
         else if (prob > 0.4) riskCategory = 'Medium';
         else riskCategory = 'Low';
         
         const riskColorClass = riskCategory === 'Low' ? 'risk-low' : riskCategory === 'Medium' ? 'risk-medium' : 'risk-high';
-        
         const paymentHistoryHTML = applicant.history
             .map(h => {
                 const statusClass = h.Payment_Status.includes('late') ? 'risk-high' : h.Payment_Status.includes('early') ? 'risk-low' : '';
@@ -92,182 +23,118 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .join('');
 
-        const applicantName = applicant?.personal?.name || "N/A"; // SAFE ACCESS
-
         const reportHTML = `
             <div id="report-page-container" class="report-container" style="opacity: 0;">
                 <div class="report-header">
-                    <div>
-                        <h1>RISKON&trade; Digital Dossier</h1>
-                        <p class="text-gray-400">Applicant ID: ${applicantId} | Name: ${applicantName}</p>
-                    </div>
+                    <h1>RISKON&trade; Intelligence Report</h1>
                     <div class="report-info">
-                        <strong>Generated:</strong> ${new Date().toLocaleDateString('en-GB')}<br>
-                        <strong>Control:</strong> RKN${applicantId}
+                        <strong>Applicant ID:</strong> ${applicantId}<br>
+                        <strong>Report Date:</strong> ${new Date().toLocaleDateString('en-GB')}
                     </div>
                 </div>
 
-                <div class="tab-nav">
-                    <button class="tab-button active" data-tab="dashboard">Risk Dashboard</button>
-                    <button class="tab-button" data-tab="ledger">Payment Ledger</button>
-                    <button class="tab-button" data-tab="insights">AI Insights</button>
-                </div>
-
-                <div id="tab-dashboard" class="tab-content active">
-                    <div class="report-section mt-6">
-                        <div class="grid-3-col">
-                             <div class="kpi-card">
-                                <p class="label">RISKON Category</p>
-                                <p class="value ${riskColorClass}">${riskCategory}</p>
-                            </div>
-                             <div class="kpi-card">
-                                <p class="label">Default Probability</p>
-                                <p class="value">${(prob * 100).toFixed(2)}%</p>
-                            </div>
-                             <div class="kpi-card">
-                                <p class="label">CIBIL Equivalent</p>
-                                <p class="value">${cibilScore}</p>
-                            </div>
+                <div class="section grid-2-col">
+                    <div class="report-section">
+                        <h3 class="report-section-title">Personal Details</h3>
+                        <div class="report-section-content">
+                            <div class="info-pair"><span class="label">Name:</span> <span class="value">${applicant.personal.name}</span></div>
+                            <div class="info-pair"><span class="label">Date of Birth:</span> <span class="value">${applicant.personal.dob}</span></div>
+                            <div class="info-pair"><span class="label">Gender:</span> <span class="value">${applicant.personal.gender}</span></div>
                         </div>
-                         <div id="interactive-graph-container">
-                            <canvas id="interactive-graph-canvas"></canvas>
+                    </div>
+                     <div class="report-section">
+                        <h3 class="report-section-title">RISKON Score</h3>
+                         <div class="score-box">
+                            <div id="cibil-score-span" class="score-value ${riskColorClass}">300</div>
+                            <div class="score-label">CIBIL Equivalent</div>
                         </div>
                     </div>
                 </div>
 
-                <div id="tab-ledger" class="tab-content">
-                    <div class="report-section mt-6">
-                        <h3 class="report-section-title">Detailed Payment History</h3>
-                        <div class="report-section-content payment-ledger-grid">
-                            ${paymentHistoryHTML || '<p>No historical payments found.</p>'}
+                 <div class="section report-section">
+                    <h3 class="report-section-title">RISK ANALYSIS & TRACKING</h3>
+                     <div class="report-section-content">
+                         <div class="graph-container">
+                            <img src="${applicant.graphImage}" alt="Risk Trend Graph for Applicant ${applicantId}">
                         </div>
+                     </div>
+                </div>
+
+                <div class="section report-section">
+                    <h3 class="report-section-title">CREDIT ACCOUNT & PAYMENT HISTORY</h3>
+                    <div class="report-section-content payment-history-grid">
+                        ${paymentHistoryHTML || '<p>No historical payments found.</p>'}
                     </div>
                 </div>
                 
-                <div id="tab-insights" class="tab-content">
-                     <div class="report-section mt-6">
-                        <h3 class="report-section-title">AI-POWERED SUMMARY</h3>
-                        <div class="report-section-content">
-                            <div id="ai-summary-content">
-                                <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
-                                    Generate Insights
-                                </button>
+                <div class="report-generation-section">
+                     <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 flex items-center mx-auto">
+                        <svg class="w-6 h-6 mr-2" viewBox="0 0 24 24"><path fill="currentColor" d="M12,1.75A10.25,10.25,0,0,0,1.75,12A10.25,10.25,0,0,0,12,22.25A10.25,10.25,0,0,0,22.25,12A10.25,10.25,0,0,0,12,1.75ZM9.25,6a1.5,1.5,0,1,1-1.5,1.5A1.5,1.5,0,0,1,9.25,6Zm6,12a1.5,1.5,0,1,1,1.5-1.5A1.5,1.5,0,0,1,15.25,18Zm-2-6a1.5,1.5,0,1,1-1.5,1.5A1.5,1.5,0,0,1,13.25,12Z"/></svg>
+                        Generate AI Summary
+                    </button>
+                    <div id="ai-summary-container" class="hidden mt-6">
+                        <div class="report-section">
+                            <h3 class="report-section-title">QUICK SUMMARY</h3>
+                            <div class="report-section-content">
+                                <p id="ai-summary-text" class="text-base leading-relaxed text-gray-300"></p>
                             </div>
                         </div>
+                        <button id="download-pdf-btn" class="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
+                            Download as PDF
+                        </button>
                     </div>
                 </div>
             </div>`;
         
         reportContentWrapper.innerHTML = reportHTML;
+        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReportAsPDF(applicantId));
+
+        // --- GSAP ANIMATIONS FOR THE REPORT ---
+        const tl = gsap.timeline();
+        const scoreCounter = { value: 300 };
         
-        setupTabs();
-        animateInteractiveGraph(applicantId);
-        gsap.from("#report-page-container", { opacity: 0, duration: 0.5 });
-        gsap.from(".kpi-card", { opacity: 0, y: 30, stagger: 0.15, duration: 0.5, delay: 0.2 });
+        tl.to("#report-page-container", { opacity: 1, duration: 0.5 })
+          .to(scoreCounter, { 
+              value: cibilScore, 
+              duration: 1.5, 
+              ease: "power2.out",
+              onUpdate: () => {
+                  document.getElementById("cibil-score-span").textContent = Math.round(scoreCounter.value);
+              }
+          }, "-=0.2")
+          .from(".section", { opacity: 0, y: 30, stagger: 0.2, duration: 0.6 }, "-=1.2")
+          .from(".graph-container img", { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, "-=0.8");
     }
 
-    function setupTabs() {
-        const tabButtons = document.querySelectorAll('.tab-button');
-        const tabContents = document.querySelectorAll('.tab-content');
-        tabButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                tabButtons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-                const tabId = button.getAttribute('data-tab');
-                tabContents.forEach(content => {
-                    content.classList.toggle('active', content.id === `tab-${tabId}`);
-                });
-            });
-        });
-    }
-
-    function animateInteractiveGraph(applicantId) {
-        const canvas = document.getElementById('interactive-graph-canvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const applicant = applicantsData[applicantId];
-        const history = applicant.history.sort((a,b) => a.Month_Offset - b.Month_Offset);
-
-        if (history.length < 1) return;
-
-        const labels = history.map(p => `Month ${p.Month_Offset}`);
-        const data = history.map(p => p.Predicted_Prob_Default * 100);
-
-        let riskCategory = 'Low';
-        const finalRisk = data[data.length - 1];
-        if (finalRisk > 70) riskCategory = 'High';
-        else if (finalRisk > 40) riskCategory = 'Medium';
-        
-        const riskColor = riskCategory === 'Low' ? '#22c55e' : riskCategory === 'Medium' ? '#f59e0b' : '#ef4444';
-
-        currentChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Default Probability (%)',
-                    data: data,
-                    borderColor: riskColor,
-                    backgroundColor: 'transparent',
-                    tension: 0.4,
-                    pointBackgroundColor: riskColor,
-                    pointHoverRadius: 8,
-                    pointHoverBackgroundColor: '#ffffff',
-                    pointHoverBorderColor: riskColor,
-                    pointHoverBorderWidth: 2,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: {
-                    duration: 2000,
-                    easing: 'easeInOutQuart'
-                },
-                scales: {
-                    y: { beginAtZero: true, max: 100, ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
-                    x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        enabled: true,
-                        backgroundColor: '#1f2937',
-                        titleColor: '#ffffff',
-                        bodyColor: '#e5e7eb',
-                        borderColor: '#3b82f6',
-                        borderWidth: 1,
-                        padding: 10,
-                        callbacks: {
-                            label: function(context) { return `Risk: ${context.parsed.y.toFixed(2)}%`; }
-                        }
-                    }
-                }
-            }
-        });
-    }
-
+    // --- Handle Report Generation Click ---
     window.handleGenerateReport = function(applicantId) {
         const applicant = applicantsData[applicantId];
-        const summaryContent = document.getElementById('ai-summary-content');
+        const summaryContainer = document.getElementById('ai-summary-container');
+        const summaryContent = document.getElementById('ai-summary-text');
         const generateBtn = document.getElementById('generate-report-btn');
+
+        summaryContent.textContent = "";
+        summaryContainer.classList.remove('hidden');
+        gsap.set(summaryContainer, { height: 'auto', opacity: 1 });
+        gsap.from(summaryContainer, { height: 0, opacity: 0, duration: 0.6, ease: 'power2.out' });
         
         generateBtn.style.display = 'none';
-        summaryContent.innerHTML = `<p id="ai-summary-text"></p>`;
-        const p = summaryContent.querySelector('p');
-            
-        let i = 0;
-        const summary = applicant.geminiSummary;
-        function typeWriter() {
-            if (i < summary.length) {
-                p.innerHTML += summary.charAt(i);
-                i++;
-                setTimeout(typeWriter, 15);
+
+        setTimeout(() => {
+            const summary = applicant.geminiSummary;
+            let i = 0;
+            function typeWriter() {
+                if (i < summary.length) {
+                    summaryContent.innerHTML += summary.charAt(i);
+                    i++;
+                    setTimeout(typeWriter, 15);
+                }
             }
-        }
-        typeWriter();
+            typeWriter();
+        }, 800);
     }
-    
+
+   
     // --- Landing Page Animations ---
     let heroScene, heroCamera, heroRenderer, heroParticles;
     function initHeroAnimation() {
@@ -323,6 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function animateHero() { requestAnimationFrame(animateHero); if (heroRenderer) { if (heroParticles && !ScrollTrigger.isScrolling) heroParticles.rotation.y += 0.0001; heroRenderer.render(heroScene, heroCamera); } }
     window.addEventListener('resize', () => { if(heroRenderer) { heroCamera.aspect = window.innerWidth / window.innerHeight; heroCamera.updateProjectionMatrix(); heroRenderer.setSize(window.innerWidth, window.innerHeight); } }, false);
     initHeroAnimation();
+
     
     // --- "SIMPLE LINES WITH ARROWS" ANIMATION ---
     const solutionStepsData = [ 
