@@ -58,7 +58,7 @@ const applicantsData = {
         {"Month_Offset": -3, "Predicted_Prob_Default": 0.718412, "Payment_Status": "10 days late"},
         {"Month_Offset": -2, "Predicted_Prob_Default": 0.719656, "Payment_Status": "8 days late"},
         {"Month_Offset": -1, "Predicted_Prob_Default": 0.666809, "Payment_Status": "On Time"},
-        {"Month_Offset": 0, "Predicted_Prob_Default": 0.55, "Payment_Status": "3 days late"}
+        {"Month_Offset": 0, "Predicted_Prob_Default": 0.72, "Payment_Status": "3 days late"}
     ]
   },
   "338391": {
