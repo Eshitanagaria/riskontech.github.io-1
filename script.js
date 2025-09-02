@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 <div id="tab-insights" class="tab-content">
                      <div class="report-section mt-6">
-                        <h3 class="report-section-title">QUICK SUMMARY</h3>
+                        <h3 class="report-section-title">AI-POWERED SUMMARY</h3>
                         <div class="report-section-content">
                             <div id="ai-summary-content">
                                 <button id="generate-report-btn" onclick="handleGenerateReport('${applicantId}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function () {
         typeWriter();
     }
     
- // --- Landing Page Animations ---
+    // --- Landing Page Animations ---
     let heroScene, heroCamera, heroRenderer, heroParticles;
     function initHeroAnimation() {
         const container = document.getElementById('hero-animation');
