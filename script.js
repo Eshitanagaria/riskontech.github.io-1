@@ -1,3 +1,60 @@
+document.addEventListener('DOMContentLoaded', function () {
+    gsap.registerPlugin(ScrollTrigger);
+
+    // --- Page Elements ---
+    const landingPage = document.getElementById('landing-page');
+    const monitoringPage = document.getElementById('monitoring-page');
+    const reportPage = document.getElementById('report-page');
+    const demoBtn = document.getElementById('demo-btn');
+    const backToLandingBtn = document.getElementById('back-to-landing-btn');
+    const backToMonitoringBtn = document.getElementById('back-to-monitoring-btn');
+    const applicantListContainer = document.getElementById('applicant-list');
+    const reportContentWrapper = document.getElementById('report-content-wrapper');
+
+    // --- Navigation ---
+    function showPage(page) {
+        landingPage.classList.add('hidden');
+        monitoringPage.classList.add('hidden');
+        reportPage.classList.add('hidden');
+        page.classList.remove('hidden');
+        window.scrollTo(0, 0);
+    }
+    demoBtn.addEventListener('click', () => { populateApplicantList(); showPage(monitoringPage); });
+    backToLandingBtn.addEventListener('click', () => showPage(landingPage));
+    backToMonitoringBtn.addEventListener('click', () => showPage(monitoringPage));
+
+    // --- Populate Applicant List ---
+    function populateApplicantList() {
+        applicantListContainer.innerHTML = '';
+        Object.keys(applicantsData).forEach(applicantId => {
+            const applicant = applicantsData[applicantId];
+            const latestRecord = applicant.history.reduce((latest, current) => current.Month_Offset > latest.Month_Offset ? current : latest);
+            
+            // Determine Risk Category based on the final probability
+            let riskCategory;
+            if (latestRecord.Predicted_Prob_Default > 0.7) riskCategory = 'High';
+            else if (latestRecord.Predicted_Prob_Default > 0.4) riskCategory = 'Medium';
+            else riskCategory = 'Low';
+
+            const riskPercentage = (latestRecord.Predicted_Prob_Default * 100).toFixed(2);
+            const riskColorClass = riskCategory === 'Low' ? 'text-green-400' : riskCategory === 'Medium' ? 'text-yellow-400' : 'text-red-400';
+            
+            const item = document.createElement('div');
+            item.className = 'glass-card monitoring-card p-4 rounded-lg flex justify-between items-center cursor-pointer transition duration-300';
+            item.innerHTML = `
+                <div>
+                    <p class="text-slate-400 text-sm">Applicant ID</p>
+                    <p class="text-white font-semibold text-lg">${parseInt(applicantId)}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-slate-400 text-sm">Risk (${riskCategory})</p>
+                    <p class="font-semibold text-lg ${riskColorClass}">${riskPercentage}%</p>
+                </div>`;
+            item.addEventListener('click', () => { createDossierReport(applicantId); showPage(reportPage); });
+            applicantListContainer.appendChild(item);
+        });
+    }
+    
     // --- Create RISKON Themed "Dossier" Report ---
     function createDossierReport(applicantId) {
         const applicant = applicantsData[applicantId];
@@ -190,72 +247,121 @@
     function animateHero() { requestAnimationFrame(animateHero); if (heroRenderer) { if (heroParticles && !ScrollTrigger.isScrolling) heroParticles.rotation.y += 0.0001; heroRenderer.render(heroScene, heroCamera); } }
     window.addEventListener('resize', () => { if(heroRenderer) { heroCamera.aspect = window.innerWidth / window.innerHeight; heroCamera.updateProjectionMatrix(); heroRenderer.setSize(window.innerWidth, window.innerHeight); } }, false);
     initHeroAnimation();
-
     
-    // --- "SIMPLE LINES WITH ARROWS" ANIMATION ---
+    // --- "JOURNEY OF DATA" ANIMATION ---
     const solutionStepsData = [ 
-        { title: "Stage 1: Raw Material Intake", description: "Raw, disorganized data files are ingested into the RISKON Data Pipeline." },
-        { title: "Stage 2: The 'Glass Box' Chamber", description: "Features are selected (IV) and transformed (WoE) into a standardized format." },
-        { title: "Stage 3: The Cohort Sorting Hub", description: "The population is segmented into distinct financial archetypes using K-Means Clustering." },
-        { title: "Stage 4: Dynamic Calibration Lab", description: "Cohort-specific Ordinary Differential Equations (ODEs) are calibrated from historical data." },
-        { title: "Stage 5: Final Model Assembly", description: "A unique, regularized Master Risk Equation is trained for each cohort." }
+        { title: "Stage 1 - Ingestion", description: "We take in the chaos." }, 
+        { title: "Stage 2 - Processing", description: "We process and structure information." }, 
+        { title: "Stage 3 - Intelligence", description: "We learn from the patterns." }, 
+        { title: "Stage 4 - Prediction", description: "We predict risk, before it strikes." } 
     ];
     const stepsContainer = document.getElementById('solution-steps');
-    stepsContainer.innerHTML = '';
     solutionStepsData.forEach((step, i) => { stepsContainer.innerHTML += `<div class="step-content" id="step-${i}"><h3 class="text-3xl font-bold mb-3">${step.title}</h3><p class="text-slate-400 text-lg">${step.description}</p></div>`; });
     
+    let vizScene, vizCamera, vizRenderer, particles, lines, nodes, dashboard;
+    
     function initSolutionViz() {
-        const stepContents = document.querySelectorAll(".step-content");
-        stepContents.forEach((step, i) => { 
-            ScrollTrigger.create({ 
-                trigger: step, 
-                start: "top center", 
-                end: "bottom center", 
-                onEnter: () => updateSolutionSVG(i),
-                onEnterBack: () => updateSolutionSVG(i),
-            }); 
-        });
+        const container = document.getElementById('solution-viz');
+        if(!container) return;
+        vizScene = new THREE.Scene();
+        vizCamera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+        vizRenderer = new THREE.WebGLRenderer({ alpha: true });
+        vizRenderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(vizRenderer.domElement);
+        vizCamera.position.set(0, 0, 15);
 
-        const svgConnectors = document.querySelectorAll('.svg-connector');
-        svgConnectors.forEach(connector => {
-            const pathLength = connector.getTotalLength();
-            connector.style.strokeDasharray = pathLength;
-            connector.style.strokeDashoffset = pathLength;
-        });
+        // Particles
+        const particleGeo = new THREE.BufferGeometry();
+        const particleCount = 2000;
+        const posArray = new Float32Array(particleCount * 3);
+        for(let i=0; i < particleCount * 3; i++) { posArray[i] = (Math.random() - 0.5) * 20; }
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particleMat = new THREE.PointsMaterial({ size: 0.05, color: 0x94a3b8 });
+        particles = new THREE.Points(particleGeo, particleMat);
+        vizScene.add(particles);
 
-        updateSolutionSVG(0);
-    }
+        // Lines (for tubes)
+        const lineGeo = new THREE.BufferGeometry();
+        const linePos = new Float32Array(200 * 3);
+        lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0 });
+        lines = new THREE.Line(lineGeo, lineMat);
+        vizScene.add(lines);
+        
+        // Nodes (for clusters)
+        nodes = new THREE.Group();
+        vizScene.add(nodes);
 
-    function updateSolutionSVG(index) {
-        const svgNodes = document.querySelectorAll('.svg-node');
-        const svgConnectors = document.querySelectorAll('.svg-connector');
+        // Dashboard
+        const dashGeo = new THREE.PlaneGeometry(8, 5);
+        const dashMat = new THREE.MeshBasicMaterial({ color: 0x1f2937, transparent: true, opacity: 0, side: THREE.DoubleSide });
+        dashboard = new THREE.Mesh(dashGeo, dashMat);
+        vizScene.add(dashboard);
 
-        svgNodes.forEach((node, i) => {
-            node.classList.toggle('is-active', i <= index);
-        });
-
-        svgConnectors.forEach((connector, i) => {
-            const pathLength = connector.getTotalLength();
-            if (i < index) {
-                gsap.to(connector, { 
-                    strokeDashoffset: 0, 
-                    duration: 0.5,
-                    onStart: () => {
-                        connector.setAttribute('marker-end', 'url(#arrowhead-active)');
-                        connector.style.stroke = '#3b82f6';
-                    }
-                });
-            } else {
-                gsap.to(connector, { 
-                    strokeDashoffset: pathLength, 
-                    duration: 0.5,
-                    onComplete: () => {
-                        connector.setAttribute('marker-end', 'url(#arrowhead-inactive)');
-                        connector.style.stroke = '#475569';
-                    }
-                });
+        const tl = gsap.timeline({
+            scrollTrigger: {
+                trigger: "#solution-section-container",
+                start: "top top",
+                end: "bottom bottom",
+                scrub: 1,
+                onUpdate: (self) => {
+                    const progress = self.progress;
+                    const stepProgress = Math.floor(progress * solutionStepsData.length);
+                    const stepContents = document.querySelectorAll(".step-content");
+                    stepContents.forEach((step, i) => {
+                        step.classList.toggle('is-active', i === stepProgress);
+                    });
+                }
             }
         });
+
+        // Stage 1: Ingestion
+        tl.to(particles.position, { x: 0, y: 0, z: -5, duration: 0.25 });
+        tl.to(particles.scale, { x: 0.2, y: 0.2, z: 0.2, duration: 0.25 }, "<");
+        
+        // Stage 2: Processing
+        tl.to(lines.material, { opacity: 1, duration: 0.05 });
+        tl.to(particles.scale, { x: 0, y: 0, z: 0, duration: 0.05 }, "<");
+        
+        // Stage 3: Intelligence
+        tl.to(lines.material, { opacity: 0, duration: 0.05 });
+        tl.call(() => {
+            const positions = particles.geometry.attributes.position.array;
+            for(let i=0; i<particleCount; i++) {
+                const cluster = Math.floor(Math.random() * 3);
+                positions[i*3] = (cluster-1)*4 + (Math.random()-0.5)*2;
+                positions[i*3+1] = (Math.random()-0.5)*2;
+                positions[i*3+2] = (Math.random()-0.5)*2;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+        });
+        tl.to(particles.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
+        
+        // Stage 4: Prediction
+        tl.to(particles.scale, { x: 0, y: 0, z: 0, duration: 0.2 });
+        tl.to(dashboard.scale, { x: 1, y: 1, z: 1, duration: 0.2 }, "<");
+        tl.to(dashboard.material, { opacity: 0.8, duration: 0.2 }, "<");
+
+        animateViz();
+    }
+
+    function animateViz() {
+        requestAnimationFrame(animateViz);
+        if (vizRenderer) {
+            if (lines && lines.material.opacity > 0) {
+                 const linePos = lines.geometry.attributes.position.array;
+                 const t = Date.now() * 0.001;
+                 for (let i = 0; i < 200; i++) {
+                     const i3 = i * 3;
+                     const progress = i/199;
+                     linePos[i3] = Math.cos(t + progress * 10) * (3 - progress * 3);
+                     linePos[i3+1] = Math.sin(t + progress * 10) * (3 - progress * 3);
+                     linePos[i3+2] = (progress - 0.5) * 10;
+                 }
+                 lines.geometry.attributes.position.needsUpdate = true;
+            }
+            vizRenderer.render(vizScene, vizCamera);
+        }
     }
     
     initSolutionViz();
